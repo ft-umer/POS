@@ -150,7 +150,7 @@ const POSInterface = () => {
           </style>
         </head>
         <body>
-          <h2>ACME INDUSTRIES</h2>
+          <h2>Tahir Fruit Chaat</h2>
           <p>${date}</p>
           <div class="separator"></div>
           <h3>INVOICE</h3>
@@ -410,9 +410,11 @@ const POSInterface = () => {
                 {paymentMethods.map((method) => (
                   <Button
                     key={method}
+                     disabled={cart.length === 0}
                     variant={paymentMethod === method ? "default" : "outline"}
                     className="w-full text-xs sm:text-sm"
                     onClick={() => handleSelectPayment(method)}
+                    
                   >
                     {method}
                   </Button>
