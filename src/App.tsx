@@ -8,6 +8,7 @@ import { POSProvider } from "./contexts/POSContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import OrderTakers from "./components/pos/OrderTakers";
 
 const queryClient = new QueryClient();
 

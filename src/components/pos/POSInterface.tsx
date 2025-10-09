@@ -1,23 +1,61 @@
-import { useState } from 'react';
-import { usePOS, OrderType } from '@/contexts/POSContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
-import { Search, Trash2, Plus, Minus, CreditCard, Banknote, Printer } from 'lucide-react';
+"use client";
+
+import { useState } from "react";
+import { usePOS, OrderType, OrderTaker } from "@/contexts/POSContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { Search, Trash2, Plus, Minus, Printer } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 const POSInterface = () => {
-  const { products, cart, orderTakers, addToCart, removeFromCart, updateCartQuantity, completeSale } = usePOS();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [orderType, setOrderType] = useState<OrderType>('Dine In');
-  const [orderTaker, setOrderTaker] = useState(orderTakers[0]);
+  const {
+    products,
+    cart,
+    orderTakers,
+    addToCart,
+    removeFromCart,
+    updateCartQuantity,
+    completeSale,
+  } = usePOS();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [orderType, setOrderType] = useState<OrderType>("Dine In");
+  const [orderTaker, setOrderTaker] = useState<string>(orderTakers[0]?.name || "");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [invoiceNumber, setInvoiceNumber] = useState<number>(
+    Math.floor(Math.random() * 1000000)
+  );
+
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [selectedPlate, setSelectedPlate] = useState("Full Plate");
   const { toast } = useToast();
 
-  const orderTypes: OrderType[] = ['Dine In', 'Take Away', 'Drive Thru', 'Delivery'];
+  const orderTypes: OrderType[] = [
+    "Dine In",
+    "Take Away",
+    "Drive Thru",
+    "Delivery",
+  ];
+
+  const paymentMethods = ["Cash", "Online Payment"];
 
   const filteredProducts = products.filter(
     (product) =>
@@ -25,134 +63,143 @@ const POSInterface = () => {
       product.barcode?.includes(searchTerm)
   );
 
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
 
-  const handleCompleteSale = (method: string) => {
+  const handleSelectPayment = (method: string) => {
     if (cart.length === 0) {
       toast({
-        title: 'Cart is empty',
-        description: 'Add items to cart before completing sale',
-        variant: 'destructive',
+        title: "Cart is empty",
+        description: "Add items to cart before choosing payment method",
+        variant: "destructive",
       });
       return;
     }
 
-    completeSale(method, orderType, orderTaker);
+    setPaymentMethod(method);
     toast({
-      title: 'Sale completed',
-      description: `Total: ${cartTotal.toFixed(2)} PKR | ${orderType} | ${orderTaker}`,
+      title: "Payment method selected",
+      description: `You selected ${method} for payment.`,
     });
   };
-  
+
   const handlePrintBill = () => {
-  if (cart.length === 0) {
-    toast({
-      title: "Cart is empty",
-      description: "Add items to cart before printing",
-      variant: "destructive",
-    });
-    return;
-  }
+    if (cart.length === 0) {
+      toast({
+        title: "Cart is empty",
+        description: "Add items to cart before printing",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const date = new Date().toLocaleString();
-  const total = cartTotal.toFixed(2);
+    // ✅ Complete sale before printing
+    completeSale(paymentMethod, orderType, orderTaker);
 
-  // Generate HTML for cart items
-  const itemsHTML = cart
-    .map(
-      (item) => `
-        <tr>
-          <td style="text-align:left;">${item.name}</td>
-          <td style="text-align:center;">${item.quantity}</td>
-          <td style="text-align:right;">${(item.price * item.quantity).toFixed(
-            2
-          )}</td>
-        </tr>
-      `
-    )
-    .join("");
+    const date = new Date().toLocaleString();
+    const total = cartTotal.toFixed(2);
+    const invoiceId = "INV-" + invoiceNumber.toString().padStart(6, "0");
 
-  // Receipt HTML
-  const printContent = `
-    <html>
-      <head>
-        <title>Receipt</title>
-        <style>
-          body {
-            font-family: 'Courier New', monospace;
-            width: 58mm;
-            margin: 0 auto;
-            padding: 10px;
-            text-align: center;
-          }
-          h2, h3 {
-            margin: 0;
-          }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-            font-size: 12px;
-          }
-          td {
-            padding: 2px 0;
-          }
-          .separator {
-            border-top: 1px dashed #000;
-            margin: 8px 0;
-          }
-          .total {
-            font-weight: bold;
-          }
-          .footer {
-            margin-top: 10px;
-            font-size: 11px;
-          }
-        </style>
-      </head>
-      <body>
-        <h2>ACME INDUSTRIES</h2>
-        <p>${date}</p>
-        <div class="separator"></div>
-        <h3>RECEIPT</h3>
-        <div class="separator"></div>
-        <table>
-          <thead>
-            <tr>
-              <td><b>Item</b></td>
-              <td><b>Qty</b></td>
-              <td><b>Amount</b></td>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHTML}
-          </tbody>
-        </table>
-        <div class="separator"></div>
-        <table>
+    const itemsHTML = cart
+      .map(
+        (item) => `
           <tr>
-            <td colspan="2" class="total">Total</td>
-            <td class="total">${total} PKR</td>
+            <td style="text-align:left;">${item.name} ${
+          item.plateType ? `(${item.plateType})` : ""
+        }</td>
+            <td style="text-align:center;">${item.quantity}</td>
+            <td style="text-align:right;">${(
+              item.price * item.quantity
+            ).toFixed(2)}</td>
           </tr>
-        </table>
-        <div class="separator"></div>
-        <p>Order Type: ${orderType}</p>
-        <p>Handled by: ${orderTaker}</p>
-        <div class="footer">
-          <p>Thank you for your purchase!</p>
-          <p>Powered by AXIS POS</p>
-        </div>
-      </body>
-    </html>
-  `;
+        `
+      )
+      .join("");
 
-  const newWindow = window.open("", "_blank", "width=400,height=600");
-  newWindow.document.write(printContent);
-  newWindow.document.close();
-  newWindow.focus();
-  newWindow.print();
-};
+    const printContent = `
+      <html>
+        <head>
+          <title>${invoiceId}</title>
+          <style>
+            body {
+              font-family: 'Courier New', monospace;
+              width: 58mm;
+              margin: 0 auto;
+              padding: 10px;
+              text-align: center;
+            }
+            h2, h3 { margin: 0; }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              font-size: 12px;
+            }
+            td { padding: 2px 0; }
+            .separator {
+              border-top: 1px dashed #000;
+              margin: 8px 0;
+            }
+            .total { font-weight: bold; }
+            .footer {
+              margin-top: 10px;
+              font-size: 11px;
+            }
+          </style>
+        </head>
+        <body>
+          <h2>ACME INDUSTRIES</h2>
+          <p>${date}</p>
+          <div class="separator"></div>
+          <h3>INVOICE</h3>
+          <p><b>${invoiceId}</b></p>
+          <div class="separator"></div>
+          <table>
+            <thead>
+              <tr>
+                <td><b>Item</b></td>
+                <td><b>Qty</b></td>
+                <td><b>Amount</b></td>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHTML}
+            </tbody>
+          </table>
+          <div class="separator"></div>
+          <table>
+            <tr>
+              <td colspan="2" class="total">Total</td>
+              <td class="total">${total} PKR</td>
+            </tr>
+          </table>
+          <div class="separator"></div>
+          <p>Order Type: ${orderType}</p>
+          <p>Order Taker: ${orderTaker}</p>
+          <p>Payment: ${paymentMethod}</p>
+          <div class="footer">
+            <p>Thank you for your purchase!</p>
+            <p>Visit Again!</p>
+          </div>
+        </body>
+      </html>
+    `;
 
+    const newWindow = window.open("", "_blank", "width=400,height=600");
+    newWindow.document.write(printContent);
+    newWindow.document.close();
+    newWindow.focus();
+    newWindow.print();
+
+    setInvoiceNumber(Math.floor(Math.random() * 1000000));
+
+    toast({
+      title: "Sale Completed & Bill Printed",
+      description: `${paymentMethod} | ${orderType} | Total: ${total} PKR`,
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
@@ -172,13 +219,37 @@ const POSInterface = () => {
                 className="pl-10"
               />
             </div>
+
             <ScrollArea className="h-[400px] md:h-[500px]">
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 {filteredProducts.map((product) => (
                   <Card
                     key={product.id}
                     className="cursor-pointer hover:border-primary transition-colors overflow-hidden"
-                    onClick={() => addToCart(product)}
+                    onClick={() => {
+                      const plateEligibleKeywords = [
+                        "biryani",
+                        "karahi",
+                        "rice",
+                        "bbq",
+                        "meal",
+                      ];
+
+                      const isEligible =
+                        plateEligibleKeywords.some((kw) =>
+                          product.name?.toLowerCase().includes(kw)
+                        ) ||
+                        plateEligibleKeywords.some((kw) =>
+                          product.category?.toLowerCase().includes(kw)
+                        );
+
+                      if (isEligible) {
+                        setSelectedProduct(product);
+                        setSelectedPlate("Full Plate");
+                      } else {
+                        addToCart(product);
+                      }
+                    }}
                   >
                     {product.imageUrl && (
                       <div className="aspect-square overflow-hidden">
@@ -190,10 +261,16 @@ const POSInterface = () => {
                       </div>
                     )}
                     <CardContent className="p-3 md:p-4">
-                      <h3 className="font-semibold mb-1 text-sm md:text-base">{product.name}</h3>
-                      <p className="text-xs md:text-sm text-muted-foreground mb-2">{product.category}</p>
+                      <h3 className="font-semibold mb-1 text-sm md:text-base">
+                        {product.name}
+                      </h3>
+                      <p className="text-xs md:text-sm text-muted-foreground mb-2">
+                        {product.category}
+                      </p>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm md:text-lg font-bold">{product.price} PKR</span>
+                        <span className="text-sm md:text-lg font-bold">
+                          {product.price} PKR
+                        </span>
                         <span className="text-xs md:text-sm text-muted-foreground">
                           Stock: {product.stock}
                         </span>
@@ -229,16 +306,20 @@ const POSInterface = () => {
                 ))}
               </div>
             </div>
+
             <div className="space-y-2">
               <Label>Order Taker</Label>
-              <Select value={orderTaker} onValueChange={setOrderTaker}>
+              <Select
+                value={orderTaker}
+                onValueChange={(value: string) => setOrderTaker(value)}
+              >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select Order Taker" />
                 </SelectTrigger>
                 <SelectContent>
-                  {orderTakers.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
+                  {orderTakers.map((taker: OrderTaker) => (
+                    <SelectItem key={taker.id} value={taker.name}>
+                      {taker.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -247,6 +328,7 @@ const POSInterface = () => {
           </CardContent>
         </Card>
 
+        {/* Cart */}
         <Card>
           <CardHeader>
             <CardTitle>Cart</CardTitle>
@@ -270,7 +352,12 @@ const POSInterface = () => {
                           />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{item.name}</p>
+                          <p className="font-medium truncate">
+                            {item.name}{" "}
+                            <span className="text-xs text-muted-foreground">
+                              ({item.plateType || "Full Plate"})
+                            </span>
+                          </p>
                           <p className="text-sm text-muted-foreground">
                             {item.price} PKR × {item.quantity}
                           </p>
@@ -288,15 +375,21 @@ const POSInterface = () => {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                          onClick={() =>
+                            updateCartQuantity(item.id, item.quantity - 1)
+                          }
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <span className="w-12 text-center">{item.quantity}</span>
+                        <span className="w-12 text-center">
+                          {item.quantity}
+                        </span>
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                          onClick={() =>
+                            updateCartQuantity(item.id, item.quantity + 1)
+                          }
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -311,44 +404,106 @@ const POSInterface = () => {
               )}
             </ScrollArea>
 
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {paymentMethods.map((method) => (
+                  <Button
+                    key={method}
+                    variant={paymentMethod === method ? "default" : "outline"}
+                    className="w-full text-xs sm:text-sm"
+                    onClick={() => handleSelectPayment(method)}
+                  >
+                    {method}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-4">
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total:</span>
-                <span>{cartTotal.toFixed(2)} PKR</span>
-              </div>
               <Separator />
-              <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
-                <Button
-                  className="w-full"
-                  onClick={() => handleCompleteSale('Cash')}
-                  disabled={cart.length === 0}
-                >
-                  <Banknote className="h-4 w-4 mr-2" />
-                  Cash
-                </Button>
-                <Button
-                  className="w-full"
-                  variant="secondary"
-                  onClick={() => handleCompleteSale('Card')}
-                  disabled={cart.length === 0}
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Card
-                </Button>
-              </div>
               <Button
                 className="w-full"
-
                 onClick={handlePrintBill}
                 disabled={cart.length === 0}
               >
                 <Printer className="h-4 w-4 mr-2" />
-                Print
+                Complete Sale & Print Bill
               </Button>
+            </div>
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total:</span>
+              <span>{cartTotal.toFixed(2)} PKR</span>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Plate Type Dialog */}
+      {selectedProduct && (
+        <Dialog
+          open={!!selectedProduct}
+          onOpenChange={(open) => !open && setSelectedProduct(null)}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select Plate Type</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <p className="font-medium">{selectedProduct.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {selectedProduct.category}
+              </p>
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-lg font-semibold">
+                  {selectedPlate === "Half Plate"
+                    ? (selectedProduct.price / 2).toFixed(2)
+                    : selectedProduct.price.toFixed(2)}{" "}
+                  PKR
+                </span>
+              </div>
+
+              <div className="flex gap-3 mt-3">
+                <Button
+                  variant={selectedPlate === "Full Plate" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setSelectedPlate("Full Plate")}
+                >
+                  Full Plate
+                </Button>
+                <Button
+                  variant={selectedPlate === "Half Plate" ? "default" : "outline"}
+                  className="flex-1"
+                  onClick={() => setSelectedPlate("Half Plate")}
+                >
+                  Half Plate
+                </Button>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  const finalProduct = {
+                    ...selectedProduct,
+                    price:
+                      selectedPlate === "Half Plate"
+                        ? selectedProduct.price / 2
+                        : selectedProduct.price,
+                    plateType: selectedPlate,
+                  };
+                  addToCart(finalProduct);
+                  setSelectedProduct(null);
+                }}
+                className="w-full"
+              >
+                Add to Cart
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };

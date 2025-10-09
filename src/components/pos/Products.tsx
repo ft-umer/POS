@@ -12,6 +12,7 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 const Products = () => {
   const { products, addProduct, updateProduct, deleteProduct } = usePOS();
+   const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -21,17 +22,18 @@ const Products = () => {
     category: '',
     barcode: '',
     imageUrl: '',
+    plateType: 'Full Plate', // New field for plate type
   });
   const { toast } = useToast();
 
   const resetForm = () => {
-    setFormData({ name: '', price: '', stock: '', category: '', barcode: '', imageUrl: '' });
+    setFormData({ name: '', price: '', stock: '', category: '', barcode: '', imageUrl: '', plateType: 'Full Plate' });
     setEditingProduct(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingProduct) {
       updateProduct(editingProduct, {
         name: formData.name,
@@ -40,6 +42,7 @@ const Products = () => {
         category: formData.category,
         barcode: formData.barcode,
         imageUrl: formData.imageUrl,
+        plateType: formData.plateType, // ✅ include
       });
       toast({ title: 'Product updated successfully' });
     } else {
@@ -50,10 +53,12 @@ const Products = () => {
         category: formData.category,
         barcode: formData.barcode,
         imageUrl: formData.imageUrl,
+        plateType: formData.plateType, // ✅ include
       });
       toast({ title: 'Product added successfully' });
     }
-    
+
+
     resetForm();
     setIsOpen(false);
   };
@@ -67,6 +72,7 @@ const Products = () => {
       category: product.category,
       barcode: product.barcode || '',
       imageUrl: product.imageUrl || '',
+      plateType: product.plateType || 'Full Plate', // Set plate type if available
     });
     setIsOpen(true);
   };
@@ -136,23 +142,74 @@ const Products = () => {
                   required
                 />
               </div>
+
               <div className="space-y-2">
+                <Label htmlFor="plateType">Plate Type</Label>
+                <select
+                  id="plateType"
+                  value={formData.plateType}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    let adjustedPrice = formData.price;
+
+                    if (newType === "Half Plate" && formData.price) {
+                      adjustedPrice = (parseFloat(formData.price) / 2).toString();
+                    } else if (newType === "Full Plate" && formData.price) {
+                      // assume half plate was set before, double it back
+                      adjustedPrice = (parseFloat(formData.price) * 2).toString();
+                    }
+
+                    setFormData({ ...formData, plateType: newType, price: adjustedPrice });
+                  }}
+                  className="w-full border rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="Full Plate">Full Plate</option>
+                  <option value="Half Plate">Half Plate</option>
+                </select>
+              </div>
+
+
+              {/* <div className="space-y-2">
                 <Label htmlFor="barcode">Barcode (Optional)</Label>
                 <Input
                   id="barcode"
                   value={formData.barcode}
                   onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
                 />
-              </div>
+              </div> */}
               <div className="space-y-2">
-                <Label htmlFor="imageUrl">Image URL (Optional)</Label>
+                <Label htmlFor="imageUrl">Image</Label>
                 <Input
+                  type="file"
                   id="imageUrl"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const imageUrl = URL.createObjectURL(file);
+                      setFormData({ ...formData, imageUrl });
+                    }
+                  }}
                 />
+
+                {formData.imageUrl && (
+                  <div className="relative inline-block mt-2">
+                    <img
+                      src={formData.imageUrl}
+                      alt="Preview"
+                      className="w-24 h-24 object-cover rounded-md border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, imageUrl: "" })}
+                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
+
               <Button type="submit" className="w-full">
                 {editingProduct ? 'Update Product' : 'Add Product'}
               </Button>
@@ -211,20 +268,30 @@ const Products = () => {
                 <TableHead>Category</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Barcode</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Plate Type</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {products.map((product) => (
                 <TableRow key={product.id}>
-                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell className="font-medium flex items-center gap-3">
+                    {product.imageUrl && (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-10 h-10 object-cover rounded"
+                      />
+                    )}
+                    {product.name}
+                  </TableCell>
+
                   <TableCell>{product.category}</TableCell>
                   <TableCell>{product.price} PKR</TableCell>
                   <TableCell>{product.stock}</TableCell>
-                  <TableCell>{product.barcode || '-'}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell>{product.plateType}</TableCell>
+                  <TableCell>
+                    <div className="flex justify-start gap-2">
                       <Button
                         variant="ghost"
                         size="icon"

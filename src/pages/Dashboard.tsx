@@ -1,25 +1,24 @@
 import { Navigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShoppingCart, Package, BarChart3, Menu, X } from 'lucide-react';
+import { LogOut, ShoppingCart, Package, BarChart3, Menu, X, UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import POSInterface from '@/components/pos/POSInterface';
 import Products from '@/components/pos/Products';
 import Sales from '@/components/pos/Sales';
+import OrderTakers from '@/components/pos/OrderTakers';
 
 const Dashboard = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
 
   const navigation = [
     { name: 'Home', path: '/dashboard', icon: ShoppingCart },
     { name: 'Products', path: '/dashboard/products', icon: Package },
     { name: 'Sales', path: '/dashboard/sales', icon: BarChart3 },
+    { name: 'Order Takers', path: '/dashboard/order-takers', icon: UserCheck },
   ];
 
   return (
@@ -36,8 +35,10 @@ const Dashboard = () => {
             >
               {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
-            <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-            <h1 className="text-lg sm:text-xl font-bold">POS System</h1>
+            <Link to="/dashboard" className='flex items-center gap-2 sm:gap-3"'>
+              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              <h1 className="text-lg sm:text-xl font-bold">Tahir Fruit Chaat</h1>
+            </Link>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <span className="hidden sm:inline text-sm text-muted-foreground">
@@ -79,7 +80,7 @@ const Dashboard = () => {
                 >
                   <Button
                     variant={isActive ? 'secondary' : 'ghost'}
-                    className="w-full justify-start text-base"
+                    className="w-full m-1 justify-start text-base"
                   >
                     <Icon className="h-5 w-5 mr-3" />
                     {item.name}
@@ -96,6 +97,7 @@ const Dashboard = () => {
             <Route path="/" element={<POSInterface />} />
             <Route path="/products" element={<Products />} />
             <Route path="/sales" element={<Sales />} />
+            <Route path="/order-takers" element={<OrderTakers />} />
           </Routes>
         </main>
       </div>

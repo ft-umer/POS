@@ -79,23 +79,23 @@ const Sales = () => {
           <CardTitle className="text-lg sm:text-xl">Sales by Order Taker</CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-6">
-          <Tabs defaultValue={orderTakers[0]} className="w-full">
+          <Tabs defaultValue={orderTakers[0].name} className="w-full">
             <div className="overflow-x-auto px-4 sm:px-0">
               <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full" style={{ gridTemplateColumns: `repeat(${orderTakers.length}, 1fr)` }}>
                 {orderTakers.map((taker) => (
-                  <TabsTrigger key={taker} value={taker} className="whitespace-nowrap px-4 sm:px-6">
-                    {taker}
+                  <TabsTrigger key={taker.id} value={taker.name} className="whitespace-nowrap px-4 sm:px-6">
+                    {taker.name}
                   </TabsTrigger>
                 ))}
               </TabsList>
             </div>
             {orderTakers.map((taker) => {
-              const takerSales = getSalesByOrderTaker(taker);
+              const takerSales = getSalesByOrderTaker(taker.name);
               const orderTypeStats = getOrderTypeStats(takerSales);
               const takerRevenue = takerSales.reduce((sum, sale) => sum + sale.total, 0);
 
               return (
-                <TabsContent key={taker} value={taker} className="space-y-4 px-4 sm:px-0 mt-4">
+                <TabsContent key={taker.id} value={taker.name} className="space-y-4 px-4 sm:px-0 mt-4">
                   {/* Order Type Stats */}
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     <Card>
@@ -140,7 +140,7 @@ const Sales = () => {
                   <Card>
                     <CardHeader>
                       <CardTitle className="text-base sm:text-lg">
-                        {taker}'s Orders - Total: {takerRevenue.toFixed(2)} PKR
+                        {taker.name}'s Orders - Total: {takerRevenue.toFixed(2)} PKR
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0 sm:p-6">
