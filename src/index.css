@@ -6,8 +6,19 @@
 All colors MUST be HSL.
 */
 
+
+
+
 @layer base {
+
+  
   :root {
+     --color-primary: #FF7A00; /* Orange accent */
+  --color-bg: #FFFFFF;      /* White background */
+  --color-text: #000000;    /* Black text */
+  --color-muted: #4D4D4D;   /* Subtle dark gray for secondary text */
+  --color-border: #E5E5E5;  /* Light gray borders */
+  --color-hover: #FF9B33;   /* Lighter orange hover state */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
