@@ -31,7 +31,8 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background text-text flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-border shadow-sm">
+      <header className="sticky top-0 z-50 bg-white/60 backdrop-blur-md border-b border-white/20 shadow-sm">
+
         <div className="flex items-center justify-between px-4 sm:px-6 py-3">
           {/* Logo and Menu */}
           <div className="flex items-center gap-2 sm:gap-3">
@@ -51,7 +52,7 @@ const Dashboard = () => {
               to="/dashboard"
               className="flex items-center gap-2 hover:opacity-90 transition"
             >
-              <ShoppingCart className="h-6 w-6 text-primary" />
+              <img className="h-[90px] w-[90px] text-primary" src="logo.png" />
               <h1 className="text-lg sm:text-xl font-bold text-text">
                 Tahir Fruit Chaat
               </h1>

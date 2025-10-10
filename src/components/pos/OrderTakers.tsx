@@ -32,21 +32,27 @@ const OrderTakers = () => {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    balance: 0,
   });
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "" });
+    setFormData({ name: "", phone: "", balance: 0 });
     setEditingTaker(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const takerData = {
+      ...formData,
+      balance: Number(formData.balance) || 0,
+    };
+
     if (editingTaker) {
-      updateOrderTaker(editingTaker, formData);
+      updateOrderTaker(editingTaker, takerData);
       toast({ title: "Order taker updated successfully" });
     } else {
-      addOrderTaker(formData);
+      addOrderTaker(takerData);
       toast({ title: "Order taker added successfully" });
     }
 
@@ -59,6 +65,7 @@ const OrderTakers = () => {
     setFormData({
       name: taker.name,
       phone: taker.phone,
+      balance: taker.balance ?? 0,
     });
     setIsOpen(true);
   };
@@ -99,6 +106,7 @@ const OrderTakers = () => {
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+              {/* Full Name */}
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-text">
                   Full Name
@@ -106,12 +114,15 @@ const OrderTakers = () => {
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
                   required
                   className="border-border focus:ring-2 focus:ring-primary"
                 />
               </div>
 
+              {/* Phone */}
               <div className="space-y-2">
                 <Label htmlFor="phone" className="text-sm font-medium text-text">
                   Phone Number
@@ -120,8 +131,27 @@ const OrderTakers = () => {
                   id="phone"
                   type="tel"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
                   required
+                  className="border-border focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              {/* Balance */}
+              <div className="space-y-2">
+                <Label htmlFor="balance" className="text-sm font-medium text-text">
+                  Balance (Rs.)
+                </Label>
+                <Input
+                  id="balance"
+                  type="number"
+                  value={formData.balance}
+                  onChange={(e) =>
+                    setFormData({ ...formData, balance: Number(e.target.value) })
+                  }
+                  min={0}
                   className="border-border focus:ring-2 focus:ring-primary"
                 />
               </div>
@@ -145,18 +175,21 @@ const OrderTakers = () => {
               <TableRow>
                 <TableHead className="text-text font-semibold">Name</TableHead>
                 <TableHead className="text-text font-semibold">Phone</TableHead>
-                <TableHead className="text-text font-semibold text-center">Actions</TableHead>
+                <TableHead className="text-text font-semibold">Balance</TableHead>
+                <TableHead className="text-text font-semibold text-center">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {orderTakers.length > 0 ? (
                 orderTakers.map((taker) => (
-                  <TableRow
-                    key={taker.id}
-                    className="hover:bg-orange-50 transition"
-                  >
+                  <TableRow key={taker.id} className="hover:bg-orange-50 transition">
                     <TableCell className="font-medium text-text">{taker.name}</TableCell>
                     <TableCell className="text-muted">{taker.phone}</TableCell>
+                    <TableCell className="text-green-700 font-semibold">
+                      Rs. {(taker.balance ?? 0).toLocaleString()}
+                    </TableCell>
                     <TableCell>
                       <div className="flex justify-center gap-2">
                         <Button
@@ -181,7 +214,7 @@ const OrderTakers = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-6 text-muted">
+                  <TableCell colSpan={4} className="text-center py-6 text-muted">
                     No order takers found.
                   </TableCell>
                 </TableRow>

@@ -43,7 +43,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Sales = () => {
-  const { sales, setSales, orderTakers } = usePOS();
+  const { sales, deleteSale, updateSale, orderTakers } = usePOS();
   const { toast } = useToast();
 
   const [editingSale, setEditingSale] = useState<any | null>(null);
@@ -81,13 +81,13 @@ const Sales = () => {
     const updatedSales = sales.map((s) =>
       s.id === editingSale.id ? editingSale : s
     );
-    setSales(updatedSales);
+    updateSale(editingSale.id, editingSale);
     toast({ title: "Sale Updated", description: "Changes saved successfully." });
     setEditingSale(null);
   };
 
   const handleDeleteConfirm = () => {
-    setSales((prev) => prev.filter((s) => s.id !== deletingSale.id));
+    deleteSale(deletingSale.id);
     toast({ title: "Sale Deleted", description: "Sale removed successfully." });
     setDeletingSale(null);
   };

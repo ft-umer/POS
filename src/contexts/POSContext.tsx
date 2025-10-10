@@ -40,6 +40,8 @@ export interface OrderTaker {
   id: string;
   name: string;
   phone: string;
+  balance: number; // 💰 amount available to take orders
+  imageUrl?: string;
 }
 
 // ======================
@@ -148,27 +150,70 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
     return saved ? JSON.parse(saved) : [];
   });
 
+
   const [orderTakers, setOrderTakers] = useState<OrderTaker[]>(() => {
     const saved = localStorage.getItem("pos_orderTakers");
     return saved
       ? JSON.parse(saved)
       : [
-        { id: "1", name: "Ahmad", phone: "03001234567" },
-        { id: "2", name: "Sara", phone: "03002345678" },
-        { id: "3", name: "Hassan", phone: "03003456789" },
+        { id: "1", name: "Ahmad", phone: "03001234567", balance: 5000 },
+        { id: "2", name: "Sara", phone: "03002345678", balance: 3000 },
+        { id: "3", name: "Hassan", phone: "03003456789", balance: 7000 },
       ];
   });
 
-  const updateSale = (saleId: string, updatedData: any) => {
-    setSales((prevSales) =>
-      prevSales.map((sale) =>
-        sale.id === saleId ? { ...sale, ...updatedData } : sale
+
+  const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
+  setSales((prevSales) => {
+    const existingSale = prevSales.find((sale) => sale.id === saleId);
+    if (!existingSale) return prevSales;
+
+    const updatedSale = { ...existingSale, ...updatedData };
+    const newTotal = updatedSale.total ?? existingSale.total;
+
+    // 🚫 Skip if no change in total
+    if (newTotal === existingSale.total) return prevSales;
+
+    const totalDiff = newTotal - existingSale.total;
+    if (totalDiff === 0) return prevSales;
+
+    // ✅ Deduct or refund balance only ONCE
+    setOrderTakers((prevTakers) =>
+      prevTakers.map((taker) =>
+        taker.name === existingSale.orderTaker
+          ? { ...taker, balance: taker.balance - totalDiff }
+          : taker
       )
     );
-  };
+
+    const updatedSales = prevSales.map((sale) =>
+      sale.id === saleId ? updatedSale : sale
+    );
+
+    localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
+    return updatedSales;
+  });
+};
+
 
   const deleteSale = (saleId: string) => {
-    setSales((prevSales) => prevSales.filter((sale) => sale.id !== saleId));
+    setSales((prevSales) => {
+      const saleToDelete = prevSales.find((sale) => sale.id === saleId);
+      if (!saleToDelete) return prevSales;
+
+      // 💰 Refund the sale amount to the order taker
+      setOrderTakers((prevTakers) =>
+        prevTakers.map((taker) =>
+          taker.name === saleToDelete.orderTaker
+            ? { ...taker, balance: taker.balance + saleToDelete.total }
+            : taker
+        )
+      );
+
+      const updatedSales = prevSales.filter((sale) => sale.id !== saleId);
+      localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
+      return updatedSales;
+    });
   };
 
 
@@ -228,10 +273,23 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   const completeSale = (
     paymentMethod: string,
     orderType: OrderType,
-    orderTaker: string
+    orderTakerId: string
   ) => {
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+    const taker = orderTakers.find((t) => t.id === orderTakerId);
+    if (!taker) {
+      alert("Invalid order taker selected.");
+      return;
+    }
+
+    // 🚫 Check balance
+    if (taker.balance < total) {
+      alert(`${taker.name} has insufficient balance to take this order.`);
+      return;
+    }
+
+    // ✅ Create the sale
     const sale: Sale = {
       id: Date.now().toString(),
       items: cart,
@@ -239,12 +297,19 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
       date: new Date().toISOString(),
       paymentMethod,
       orderType,
-      orderTaker,
+      orderTaker: taker.name,
     };
 
     setSales((prev) => [sale, ...prev]);
 
-    // Update stock
+    // 🧮 Deduct balance from the order taker
+    setOrderTakers((prev) =>
+      prev.map((t) =>
+        t.id === orderTakerId ? { ...t, balance: t.balance - total } : t
+      )
+    );
+
+    // 📉 Update product stock
     setProducts((prev) =>
       prev.map((product) => {
         const cartItem = cart.find((item) => item.id === product.id);
@@ -257,6 +322,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
 
     clearCart();
   };
+
 
   // ======================
   // Product CRUD

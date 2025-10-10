@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Search, Trash2, Plus, Minus, Printer } from "lucide-react";
+import { Search, Trash2, Plus, Minus, Printer, CheckCircle, XCircle, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +38,7 @@ const POSInterface = () => {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [orderType, setOrderType] = useState<OrderType>("Dine In");
-  const [orderTaker, setOrderTaker] = useState<string>(orderTakers[0]?.name || "");
+  const [orderTaker, setOrderTaker] = useState<string>(orderTakers[0]?.id || "");
   const [paymentMethod, setPaymentMethod] = useState("Cash");
   const [invoiceNumber, setInvoiceNumber] = useState<number>(
     Math.floor(Math.random() * 1000000)
@@ -58,6 +58,128 @@ const POSInterface = () => {
 
   const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  // ✅ Get the current order taker object
+  const currentTaker = orderTakers.find((t) => t.id === orderTaker);
+  const handlePrintBill = () => {
+    if (!currentTaker) {
+      toast({
+        title: "Select Order Taker",
+        description: "Please choose an order taker before completing sale.",
+
+      });
+      return;
+    }
+
+    if (currentTaker.balance <= 0) {
+      toast({
+        title: "Insufficient Balance",
+        description: `${currentTaker.name} cannot take more orders.`,
+        variant: "error",
+
+      });
+      return;
+    }
+
+    if (currentTaker.balance < cartTotal) {
+      toast({
+        title: "Low Balance",
+        description: `Not enough balance (${currentTaker.balance.toFixed(2)} Rs) for ${currentTaker.name} to complete this order.`,
+      });
+      return;
+    }
+
+    // 🧾 Prepare sale data
+    const date = new Date().toLocaleString();
+    const total = cartTotal.toFixed(2);
+    const invoiceId = "INV-" + invoiceNumber.toString().padStart(3, "0");
+
+
+    // ✅ Complete the POS sale (clear cart, etc)
+    completeSale(paymentMethod, orderType, orderTaker);
+
+    // 🖨️ Print Bill (same logic)
+    const itemsHTML = cart
+      .map(
+        (item) => `
+        <tr>
+          <td style="text-align:left;">${item.name} ${item.plateType ? `(${item.plateType})` : ""
+          }</td>
+          <td style="text-align:center;">${item.quantity}</td>
+          <td style="text-align:right;">${(item.price * item.quantity).toFixed(2)}</td>
+        </tr>`
+      )
+      .join("");
+
+    const printContent = `
+    <html>
+      <head>
+        <title>${invoiceId}</title>
+        <style>
+          body {
+            font-family: 'Courier New', monospace;
+            width: 58mm;
+            margin: 0 auto;
+            padding: 10px;
+            text-align: center;
+          }
+          h2, h3 { margin: 0; }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 12px;
+          }
+          td { padding: 2px 0; }
+          .separator { border-top: 1px dashed #000; margin: 8px 0; }
+          .total { font-weight: bold; }
+          .footer { margin-top: 10px; font-size: 11px; }
+        </style>
+      </head>
+      <body>
+      <img src="logo.png" alt="Logo" style="width:90px; height:auto; margin-bottom:10px;" />
+        <h2>Tahir Fruit Chaat</h2>
+        <p>${date}</p>
+        <div class="separator"></div>
+        <h3>INVOICE</h3>
+        <p><b>${invoiceId}</b></p>
+        <div class="separator"></div>
+        <table>
+          <thead>
+            <tr><td><b>Item</b></td><td><b>Qty</b></td><td><b>Amount</b></td></tr>
+          </thead>
+          <tbody>${itemsHTML}</tbody>
+        </table>
+        <div class="separator"></div>
+        <table>
+          <tr><td colspan="2" class="total">Total</td><td class="total">${total} PKR</td></tr>
+        </table>
+        <div class="separator"></div>
+        <p>Order Type: ${orderType}</p>
+        <p>Order Taker: ${orderTaker}</p>
+        <p>Payment: ${paymentMethod}</p>
+        <div class="footer">
+          <p>Thank you for your purchase!</p>
+          <p>Visit Again!</p>
+        </div>
+      </body>
+    </html>
+  `;
+
+    const newWindow = window.open("", "_blank", "width=400,height=600");
+    newWindow.document.write(printContent);
+    newWindow.document.close();
+    newWindow.focus();
+    newWindow.print();
+
+    setInvoiceNumber(Math.floor(Math.random() * 1000000));
+
+    toast({
+      title: "Sale Completed",
+      description: `${paymentMethod} | ${orderType} | Total: ${total} PKR. Balance Left: ${currentTaker.balance - cartTotal
+        } Rs.`,
+    });
+  };
+
   const handleSelectPayment = (method: string) => {
     if (cart.length === 0) {
       toast({
@@ -69,120 +191,8 @@ const POSInterface = () => {
     }
 
     setPaymentMethod(method);
-   
+
   };
-
-  const handlePrintBill = () => {
-    if (cart.length === 0) {
-      toast({
-        title: "Cart is empty",
-        description: "Add items to cart before printing",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    completeSale(paymentMethod, orderType, orderTaker);
-
-    const date = new Date().toLocaleString();
-    const total = cartTotal.toFixed(2);
-    const invoiceId = "INV-" + invoiceNumber.toString().padStart(3, "0");
-
-    const itemsHTML = cart
-      .map(
-        (item) => `
-          <tr>
-            <td style="text-align:left;">${item.name} ${
-          item.plateType ? `(${item.plateType})` : ""
-        }</td>
-            <td style="text-align:center;">${item.quantity}</td>
-            <td style="text-align:right;">${(item.price * item.quantity).toFixed(2)}</td>
-          </tr>
-        `
-      )
-      .join("");
-
-    const printContent = `
-      <html>
-        <head>
-          <title>${invoiceId}</title>
-          <style>
-            body {
-              font-family: 'Courier New', monospace;
-              width: 58mm;
-              margin: 0 auto;
-              padding: 10px;
-              text-align: center;
-            }
-            h2, h3 { margin: 0; }
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-top: 10px;
-              font-size: 12px;
-            }
-            td { padding: 2px 0; }
-            .separator {
-              border-top: 1px dashed #000;
-              margin: 8px 0;
-            }
-            .total { font-weight: bold; }
-            .footer {
-              margin-top: 10px;
-              font-size: 11px;
-            }
-          </style>
-        </head>
-        <body>
-          <h2>Tahir Fruit Chaat</h2>
-          <p>${date}</p>
-          <div class="separator"></div>
-          <h3>INVOICE</h3>
-          <p><b>${invoiceId}</b></p>
-          <div class="separator"></div>
-          <table>
-            <thead>
-              <tr>
-                <td><b>Item</b></td>
-                <td><b>Qty</b></td>
-                <td><b>Amount</b></td>
-              </tr>
-            </thead>
-            <tbody>${itemsHTML}</tbody>
-          </table>
-          <div class="separator"></div>
-          <table>
-            <tr>
-              <td colspan="2" class="total">Total</td>
-              <td class="total">${total} PKR</td>
-            </tr>
-          </table>
-          <div class="separator"></div>
-          <p>Order Type: ${orderType}</p>
-          <p>Order Taker: ${orderTaker}</p>
-          <p>Payment: ${paymentMethod}</p>
-          <div class="footer">
-            <p>Thank you for your purchase!</p>
-            <p>Visit Again!</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    const newWindow = window.open("", "_blank", "width=400,height=600");
-    newWindow.document.write(printContent);
-    newWindow.document.close();
-    newWindow.focus();
-    newWindow.print();
-
-    setInvoiceNumber(Math.floor(Math.random() * 1000000));
-
-    toast({
-      title: "Sale Completed & Bill Printed",
-      description: `${paymentMethod} | ${orderType} | Total: ${total} PKR`,
-    });
-  };
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 bg-white text-black">
       {/* Products Section */}
@@ -190,10 +200,29 @@ const POSInterface = () => {
         <Card className="border border-gray-200 shadow-md rounded-2xl">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-black">
-              Products
+              <div>
+                <Label className="text-lg semi-bold">Order Type</Label>
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {orderTypes.map((type) => (
+                    <Button
+                      key={type}
+                      variant={orderType === type ? "default" : "outline"}
+                      className={`w-full text-xs ${orderType === type
+                        ? "bg-[#ff6600] text-white"
+                        : "border-gray-300 text-black hover:border-[#ff6600]"
+                        }`}
+                      onClick={() => setOrderType(type)}
+                    >
+                      {type}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <Label className="text-lg font-semibold">Products</Label>
             <div className="relative mb-4">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -270,44 +299,76 @@ const POSInterface = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Order Type */}
-            <div>
+            {/* <div>
               <Label>Order Type</Label>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {orderTypes.map((type) => (
                   <Button
                     key={type}
                     variant={orderType === type ? "default" : "outline"}
-                    className={`w-full text-xs ${
-                      orderType === type
-                        ? "bg-[#ff6600] text-white"
-                        : "border-gray-300 text-black hover:border-[#ff6600]"
-                    }`}
+                    className={`w-full text-xs ${orderType === type
+                      ? "bg-[#ff6600] text-white"
+                      : "border-gray-300 text-black hover:border-[#ff6600]"
+                      }`}
                     onClick={() => setOrderType(type)}
                   >
                     {type}
                   </Button>
                 ))}
               </div>
-            </div>
+            </div> */}
 
             {/* Order Taker */}
             <div>
               <Label>Order Taker</Label>
-              <Select
-                value={orderTaker}
-                onValueChange={(value: string) => setOrderTaker(value)}
-              >
-                <SelectTrigger className="border-gray-300 focus:ring-[#ff6600] focus:border-[#ff6600]">
-                  <SelectValue placeholder="Select Order Taker" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orderTakers.map((taker: OrderTaker) => (
-                    <SelectItem key={taker.id} value={taker.name}>
-                      {taker.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 mt-6">
+                {orderTakers.map((taker) => {
+                  const isSelected = orderTaker === taker.id;
+                  const isDisabled = taker.balance <= 0;
+
+                  return (
+                    <div
+                      key={taker.id}
+                      onClick={() => !isDisabled && setOrderTaker(taker.id)}
+                      className={`
+          relative flex flex-col items-center justify-center p-4
+          rounded-2xl border-[2px] backdrop-blur-md transition-all duration-300
+          cursor-pointer overflow-hidden
+          ${isSelected
+                          ? "border-[#ff6600] bg-white/60 shadow-xl scale-[1.03]"
+                          : "border-transparent bg-white/30 hover:bg-white/50 hover:shadow-md"
+                        }
+          ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+        `}
+                    >
+                      {/* Image */}
+
+                      <User
+
+                        className="w-10 h-10 rounded-xl object-cover mb-3 border border-[#ff6600]/40"
+                      />
+
+                      {/* Name & Balance */}
+                      <div className="text-center">
+                        <h3 className="text-sm text-gray-800">
+                          {taker.name}
+                        </h3>
+                        <p
+                          className={`text-sm ${taker.balance > 0 ? "text-green-600" : "text-red-500"
+                            }`}
+                        >
+                          Balance: Rs. {taker.balance.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                  
+                  
+                  
+                })}
+                
+              </div>
+             
             </div>
           </CardContent>
         </Card>
@@ -340,9 +401,7 @@ const POSInterface = () => {
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-black truncate">
                             {item.name}{" "}
-                            <span className="text-xs text-gray-500">
-                              ({item.plateType || "Full Plate"})
-                            </span>
+
                           </p>
                           <p className="text-sm text-gray-500">
                             {item.price} PKR × {item.quantity}
@@ -403,11 +462,10 @@ const POSInterface = () => {
                     key={method}
                     disabled={cart.length === 0}
                     onClick={() => handleSelectPayment(method)}
-                    className={`w-full text-xs ${
-                      paymentMethod === method
-                        ? "bg-[#ff6600] text-white"
-                        : "border-gray-300 text-black hover:border-[#ff6600]"
-                    }`}
+                    className={`w-full text-xs ${paymentMethod === method
+                      ? "bg-[#ff6600] text-white"
+                      : "border-gray-300 text-black hover:border-[#ff6600]"
+                      }`}
                   >
                     {method}
                   </Button>
@@ -457,48 +515,50 @@ const POSInterface = () => {
               <div className="flex gap-3 mt-3">
                 <Button
                   variant={selectedPlate === "Full Plate" ? "default" : "outline"}
-                  className={`flex-1 ${
-                    selectedPlate === "Full Plate"
-                      ? "bg-[#ff6600] text-white"
-                      : "border-gray-300 text-black hover:border-[#ff6600]"
-                  }`}
-                  onClick={() => setSelectedPlate("Full Plate")}
+                  className={`flex-1 ${selectedPlate === "Full Plate"
+                    ? "bg-[#ff6600] text-white"
+                    : "border-gray-300 text-black hover:border-[#ff6600]"
+                    }`}
+                  onClick={() => {
+                    const finalProduct = {
+                      ...selectedProduct,
+                      price:
+                        selectedPlate === "Half Plate"
+                          ? selectedProduct.price / 2
+                          : selectedProduct.price,
+                      plateType: selectedPlate,
+                    };
+                    addToCart(finalProduct);
+                    setSelectedProduct(null);
+                    setSelectedPlate("Full Plate");
+                  }}
                 >
                   Full Plate
                 </Button>
                 <Button
                   variant={selectedPlate === "Half Plate" ? "default" : "outline"}
-                  className={`flex-1 ${
-                    selectedPlate === "Half Plate"
-                      ? "bg-[#ff6600] text-white"
-                      : "border-gray-300 text-black hover:border-[#ff6600]"
-                  }`}
-                  onClick={() => setSelectedPlate("Half Plate")}
+                  className={`flex-1 ${selectedPlate === "Half Plate"
+                    ? "bg-[#ff6600] text-white"
+                    : "border-gray-300 text-black hover:border-[#ff6600]"
+                    }`}
+                  onClick={() => {
+                    const finalProduct = {
+                      ...selectedProduct,
+                      price:
+                        selectedPlate === "Half Plate"
+                          ? selectedProduct.price / 2
+                          : selectedProduct.price,
+                      plateType: selectedPlate,
+                    };
+                    addToCart(finalProduct);
+                    setSelectedProduct(null);
+                    setSelectedPlate("Half Plate");
+                  }}
                 >
                   Half Plate
                 </Button>
               </div>
             </div>
-
-            <DialogFooter>
-              <Button
-                onClick={() => {
-                  const finalProduct = {
-                    ...selectedProduct,
-                    price:
-                      selectedPlate === "Half Plate"
-                        ? selectedProduct.price / 2
-                        : selectedProduct.price,
-                    plateType: selectedPlate,
-                  };
-                  addToCart(finalProduct);
-                  setSelectedProduct(null);
-                }}
-                className="w-full bg-[#ff6600] hover:bg-[#e65c00] text-white"
-              >
-                Add to Cart
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
