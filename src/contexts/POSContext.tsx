@@ -65,6 +65,9 @@ interface POSContextType {
   addOrderTaker: (taker: Omit<OrderTaker, "id">) => void;
   updateOrderTaker: (id: string, taker: Partial<OrderTaker>) => void;
   deleteOrderTaker: (id: string) => void;
+  updateSale(saleId: string, updatedData: any)
+  deleteSale(saleId: string)
+
 }
 
 // ======================
@@ -150,11 +153,24 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
     return saved
       ? JSON.parse(saved)
       : [
-          { id: "1", name: "Ahmad", phone: "03001234567" },
-          { id: "2", name: "Sara", phone: "03002345678" },
-          { id: "3", name: "Hassan", phone: "03003456789" },
-        ];
+        { id: "1", name: "Ahmad", phone: "03001234567" },
+        { id: "2", name: "Sara", phone: "03002345678" },
+        { id: "3", name: "Hassan", phone: "03003456789" },
+      ];
   });
+
+  const updateSale = (saleId: string, updatedData: any) => {
+    setSales((prevSales) =>
+      prevSales.map((sale) =>
+        sale.id === saleId ? { ...sale, ...updatedData } : sale
+      )
+    );
+  };
+
+  const deleteSale = (saleId: string) => {
+    setSales((prevSales) => prevSales.filter((sale) => sale.id !== saleId));
+  };
+
 
   // ======================
   // Persist data
@@ -299,6 +315,8 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
         addOrderTaker,
         updateOrderTaker,
         deleteOrderTaker,
+        updateSale,
+        deleteSale,
       }}
     >
       {children}
