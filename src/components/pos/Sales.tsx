@@ -43,7 +43,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Sales = () => {
-  const { sales, deleteSale, updateSale, orderTakers } = usePOS();
+  const { sales, deleteSale, orderTakers } = usePOS();
   const { toast } = useToast();
 
   const [editingSale, setEditingSale] = useState<any | null>(null);

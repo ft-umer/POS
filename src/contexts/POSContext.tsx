@@ -67,10 +67,10 @@ interface POSContextType {
   addOrderTaker: (taker: Omit<OrderTaker, "id">) => void;
   updateOrderTaker: (id: string, taker: Partial<OrderTaker>) => void;
   deleteOrderTaker: (id: string) => void;
-  updateSale(saleId: string, updatedData: any)
-  deleteSale(saleId: string)
-
+  updateSale: (saleId: string, updatedData: any) => void;
+  deleteSale: (saleId: string) => void;
 }
+
 
 // ======================
 // Default Data
@@ -163,7 +163,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   });
 
 
-  const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
+const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
   setSales((prevSales) => {
     const existingSale = prevSales.find((sale) => sale.id === saleId);
     if (!existingSale) return prevSales;
@@ -177,7 +177,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
     const totalDiff = newTotal - existingSale.total;
     if (totalDiff === 0) return prevSales;
 
-    // ✅ Deduct or refund balance only ONCE
+    // 💰 Adjust balance
     setOrderTakers((prevTakers) =>
       prevTakers.map((taker) =>
         taker.name === existingSale.orderTaker
@@ -194,6 +194,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
     return updatedSales;
   });
 };
+
 
 
   const deleteSale = (saleId: string) => {
