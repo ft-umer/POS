@@ -1,4 +1,4 @@
-import { Navigate, Routes, Route, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,25 +17,44 @@ import Sales from "@/components/pos/Sales";
 import OrderTakers from "@/components/pos/OrderTakers";
 
 const Dashboard = () => {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navigation = [
-    { name: "Home", path: "/dashboard", icon: ShoppingCart },
-    { name: "Products", path: "/dashboard/products", icon: Package },
-    { name: "Sales", path: "/dashboard/sales", icon: BarChart3 },
-    { name: "Order Takers", path: "/dashboard/order-takers", icon: UserCheck },
+    {
+      name: "Home",
+      path: "/dashboard",
+      icon: ShoppingCart,
+      image: "/images/dashboard/home.png",
+    },
+    {
+      name: "Products",
+      path: "/dashboard/products",
+      icon: Package,
+      image: "/images/dashboard/products.png",
+    },
+    {
+      name: "Sales",
+      path: "/dashboard/sales",
+      icon: BarChart3,
+      image: "/images/dashboard/sales.png",
+    },
+    {
+      name: "Order Takers",
+      path: "/dashboard/order-takers",
+      icon: UserCheck,
+      image: "/images/dashboard/order-taker.png",
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-background text-text flex flex-col">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#f7f8fa] to-[#e9edf3] text-gray-900">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/60 backdrop-blur-md border-b border-white/20 shadow-sm">
-
+      <header className="sticky top-0 z-50 bg-white/30 backdrop-blur-xl border-b border-white/20 shadow-md">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3">
-          {/* Logo and Menu */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* Logo + Mobile Menu */}
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
@@ -43,27 +62,32 @@ const Dashboard = () => {
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               {isMobileMenuOpen ? (
-                <X className="h-5 w-5 text-text" />
+                <X className="h-5 w-5" />
               ) : (
-                <Menu className="h-5 w-5 text-text" />
+                <Menu className="h-5 w-5" />
               )}
             </Button>
+
             <Link
               to="/dashboard"
               className="flex items-center gap-2 hover:opacity-90 transition"
             >
-              <img className="h-[90px] w-[90px] text-primary" src="logo.png" />
-              <h1 className="text-lg sm:text-xl font-bold text-text">
+              <img
+                src="/logo.png"
+                alt="Logo"
+                className="h-12 w-12 rounded-full object-cover"
+              />
+              <h1 className="text-lg sm:text-xl font-semibold tracking-wide">
                 Tahir Fruit Chaat
               </h1>
             </Link>
           </div>
 
           {/* User Info */}
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden sm:inline text-sm text-muted">
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:block text-sm text-gray-700">
               Welcome,{" "}
-              <span className="font-semibold text-text">
+              <span className="font-medium">
                 {user?.username || "User"}
               </span>
             </span>
@@ -71,7 +95,7 @@ const Dashboard = () => {
               variant="outline"
               size="sm"
               onClick={logout}
-              className="border-border text-text hover:bg-primary hover:text-white transition"
+              className="border-gray-300 text-gray-700 bg-white/30 backdrop-blur-sm hover:text-white transition"
             >
               <LogOut className="h-4 w-4 mr-1" />
               Logout
@@ -91,35 +115,34 @@ const Dashboard = () => {
 
         {/* Sidebar */}
         <aside
-          className={`fixed md:sticky top-[56px] md:top-0 left-0 z-40
-            w-64 bg-[#000000] text-white min-h-[calc(100vh-56px)]
+          className={`fixed md:sticky top-[60px] md:top-0 left-0 z-40
+            w-64 md:w-60 min-h-[calc(100vh-60px)] 
+            bg-white/15 backdrop-blur-lg border-r pt-4 border-white/30 shadow-lg
             transition-transform duration-300 ease-in-out
             ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
           `}
         >
-          <nav className="p-4 space-y-1">
+          <nav className="p-4 grid gap-4">
             {navigation.map((item) => {
               const isActive = location.pathname === item.path;
-              const Icon = item.icon;
               return (
                 <Link
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  <Button
-                    variant="ghost"
-                    className={`w-full justify-start text-base font-medium rounded-lg
+                  <div
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 shadow-sm
                       ${
                         isActive
-                          ? "bg-primary text-white hover:bg-hover"
-                          : "text-gray-200 hover:bg-gray-800 hover:text-primary"
+                          ? "bg-orange-500/90 text-white shadow-md scale-[1.02]"
+                          : "bg-white/40 hover:bg-white/60 text-gray-800"
                       }
                     `}
                   >
-                    <Icon className="h-5 w-5 mr-3" />
-                    {item.name}
-                  </Button>
+                   
+                    <span className="font-medium">{item.name}</span>
+                  </div>
                 </Link>
               );
             })}
@@ -127,8 +150,8 @@ const Dashboard = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-6 bg-background overflow-x-hidden">
-          <div className="rounded-lg shadow-sm border border-border bg-white p-4 md:p-6">
+        <main className="flex-1 p-4 sm:p-6 overflow-x-hidden">
+          <div className="bg-white/40 backdrop-blur-lg rounded-2xl border border-white/30 shadow-md p-4 sm:p-6">
             <Routes>
               <Route path="/" element={<POSInterface />} />
               <Route path="/products" element={<Products />} />
