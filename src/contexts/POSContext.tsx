@@ -134,28 +134,6 @@ const initialProducts: Product[] = [
   },
 ];
 
-
-const [products, setProducts] = useState<Product[]>(initialProducts);
-const [sales, setSales] = useState<Sale[]>([]);
-const [orderTakers, setOrderTakers] = useState<OrderTaker[]>([
-  { id: "1", name: "Ahmad", phone: "03001234567", balance: 5000 },
-  { id: "2", name: "Sara", phone: "03002345678", balance: 3000 },
-  { id: "3", name: "Hassan", phone: "03003456789", balance: 7000 },
-]);
-
-// Load from localStorage only on client
-useEffect(() => {
-  const savedProducts = localStorage.getItem("pos_products");
-  if (savedProducts) setProducts(JSON.parse(savedProducts));
-
-  const savedSales = localStorage.getItem("pos_sales");
-  if (savedSales) setSales(JSON.parse(savedSales));
-
-  const savedTakers = localStorage.getItem("pos_orderTakers");
-  if (savedTakers) setOrderTakers(JSON.parse(savedTakers));
-}, []);
-
-
 // ======================
 // Provider
 // ======================
@@ -171,6 +149,19 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
     const saved = localStorage.getItem("pos_sales");
     return saved ? JSON.parse(saved) : [];
   });
+
+
+  const [orderTakers, setOrderTakers] = useState<OrderTaker[]>(() => {
+    const saved = localStorage.getItem("pos_orderTakers");
+    return saved
+      ? JSON.parse(saved)
+      : [
+        { id: "1", name: "Ahmad", phone: "03001234567", balance: 5000 },
+        { id: "2", name: "Sara", phone: "03002345678", balance: 3000 },
+        { id: "3", name: "Hassan", phone: "03003456789", balance: 7000 },
+      ];
+  });
+
 
 const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
   setSales((prevSales) => {
