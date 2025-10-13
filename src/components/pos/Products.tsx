@@ -267,7 +267,7 @@ const Products = () => {
             <TableHeader className="bg-orange-100">
               <TableRow>
                 <TableHead className="font-semibold text-black">Name</TableHead>
-                <TableHead>Category</TableHead>
+               
                 <TableHead>Price</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Plate Type</TableHead>
@@ -287,7 +287,7 @@ const Products = () => {
                     )}
                     {product.name}
                   </TableCell>
-                  <TableCell>{product.category}</TableCell>
+                 
                   <TableCell className="text-primary font-semibold">
                     {product.price} PKR
                   </TableCell>

@@ -62,8 +62,8 @@ const Login = () => {
       <Card className="w-full max-w-md mx-4 shadow-md border border-gray-200">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center">
-              <ShoppingCart className="h-8 w-8 text-primary-foreground" />
+            <div className="h-20 w-20 rounded-full flex items-center justify-center">
+              <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png" className="h-full w-full" />
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">POS System</CardTitle>
@@ -115,11 +115,7 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm text-muted-foreground space-y-1">
-            <p>Demo credentials:</p>
-            <p>SuperAdmin → Username: superadmin | Password: 123456</p>
-            <p>Admin → Username: admin1/admin2/admin3 | Password: 123456 | PIN: 1111/2222/3333</p>
-          </div>
+         
         </CardContent>
       </Card>
     </div>

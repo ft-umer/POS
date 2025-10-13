@@ -14,7 +14,6 @@ export interface Product {
   name: string;
   price: number;
   stock: number;
-  category: string;
   barcode?: string;
   imageUrl?: string;
   plateType?: string;
@@ -80,59 +79,54 @@ const POSContext = createContext<POSContextType | undefined>(undefined);
 const initialProducts: Product[] = [
   {
     id: "1",
-    name: "Zinger Burger",
+    name: "زنگر برگر",
     price: 350,
-    category: "Fast Food",
     stock: 50,
     barcode: "123456",
     imageUrl: zingerBurgerImg,
   },
   {
     id: "2",
-    name: "Chicken Tikka",
+    name: "چکن تکہ",
     price: 280,
-    category: "Main Course",
     stock: 30,
     barcode: "123457",
     imageUrl: chickenTikkaImg,
   },
   {
     id: "3",
-    name: "Biryani",
+    name: "بریانی",
     price: 320,
-    category: "Main Course",
     stock: 40,
     barcode: "123458",
     imageUrl: biryaniImg,
   },
   {
     id: "4",
-    name: "Samosa",
+    name: "سموسہ",
     price: 30,
-    category: "Snacks",
     stock: 100,
     barcode: "123459",
     imageUrl: samosaImg,
   },
   {
     id: "5",
-    name: "Chai",
+    name: "چائے",
     price: 50,
-    category: "Beverages",
     stock: 200,
     barcode: "123460",
     imageUrl: chaiImg,
   },
   {
     id: "6",
-    name: "Cold Drink",
+    name: "کولڈ ڈرنک",
     price: 80,
-    category: "Beverages",
     stock: 150,
     barcode: "123461",
     imageUrl: coldDrinkImg,
   },
 ];
+
 
 // ======================
 // Provider

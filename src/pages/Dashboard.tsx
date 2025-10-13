@@ -59,7 +59,7 @@ const Dashboard = () => {
             </Button>
 
             <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-90 transition">
-              <img src="/logo.png" alt="Logo" className="h-12 w-12 rounded-full object-cover" />
+              <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png" alt="Logo" className="h-12 w-12 rounded-full object-cover" />
               <h1 className="text-lg sm:text-xl font-semibold tracking-wide">Tahir Fruit Chaat</h1>
             </Link>
           </div>

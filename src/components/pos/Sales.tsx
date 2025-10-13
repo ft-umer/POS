@@ -68,8 +68,8 @@ const Sales = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
-  
-   const [selectedDate, setSelectedDate] = useState<string>(""); // for PDF
+
+  const [selectedDate, setSelectedDate] = useState<string>(""); // for PDF
 
 
   const totalRevenue = sales.reduce((sum, sale) => sum + sale.total, 0);
@@ -107,69 +107,93 @@ const Sales = () => {
     toast({ title: "Sale Deleted", description: "Sale removed successfully." });
     setDeletingSale(null);
   };
-  
-  const getSalesByDate = (dateStr: string) =>
-    sales.filter((sale) => new Date(sale.date).toDateString() === new Date(dateStr).toDateString());
 
-// Place this function inside your Sales component, replacing the old downloadSalesPDF
-const downloadSalesPDF = (dateStr: string) => {
-  const salesOfDay = getSalesByDate(dateStr);
+  const getSalesByDate = (dateStr: string) => {
+    return sales.filter((sale) => {
+      const saleDate = new Date(sale.date);
+      const saleYMD = saleDate.toISOString().split("T")[0]; // "YYYY-MM-DD"
+      return saleYMD === dateStr;
+    });
+  };
 
-  if (!salesOfDay.length) {
-    toast({ title: "No Sales", description: "No sales recorded for this date." });
-    return;
-  }
 
-  const doc = new jsPDF();
+  const downloadSalesPDF = (dateStr: string) => {
+    const salesOfDay = getSalesByDate(dateStr);
 
-  // ===== Base64 Logo (offline-friendly) =====
- 
-  const imgWidth = 35;
-  const imgHeight = 35; // adjust if needed
-  doc.addImage("https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png", "PNG", 14, 10, imgWidth, imgHeight);
+    if (!salesOfDay.length) {
+      toast({ title: "No Sales", description: "No sales recorded for this date." });
+      return;
+    }
 
-  // ===== Header =====
-  doc.setFontSize(16);
-  doc.text(`Sales Report - ${new Date(dateStr).toLocaleDateString()}`, 14 + imgWidth + 10, 20);
-  doc.setFontSize(12);
+    const doc = new jsPDF();
+    const imgWidth = 35;
+    const imgHeight = 35;
 
-  // ===== Table Data =====
-  const tableData = salesOfDay.map((sale) => [
-    formatDate(sale.date),
-    sale.orderTaker,
-    sale.orderType,
-    sale.items
-      .map((it: any) =>
-        it.plateType
-          ? `${it.name} (${it.plateType} × ${it.quantity})`
-          : `${it.name} (${it.quantity})`
-      )
-      .join(", "),
-    sale.paymentMethod,
-    sale.total.toFixed(2),
-  ]);
+    doc.addImage(
+      "https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png",
+      "PNG",
+      14,
+      10,
+      imgWidth,
+      imgHeight
+    );
 
-  // ===== AutoTable =====
-  autoTable(doc, {
-    head: [["Date", "Order Taker", "Type", "Items", "Payment", "Total (PKR)"]],
-    body: tableData,
-    startY: 30 + imgHeight,
-    styles: { fontSize: 10 },
-    headStyles: { fillColor: [253, 186, 116] }, // orange
-  });
+    doc.setFontSize(16);
+    doc.text(`Sales Report - ${new Date(dateStr).toLocaleDateString()}`, 14 + imgWidth + 10, 20);
+    doc.setFontSize(12);
 
-  // ===== Total Revenue =====
-  const totalDayRevenue = salesOfDay.reduce((sum, sale) => sum + sale.total, 0);
-  doc.text(
-    `Total Revenue: ${totalDayRevenue.toFixed(2)} PKR`,
-    14,
-    (doc as any).lastAutoTable.finalY + 10
-  );
+    // === Group sales by order taker ===
+    const salesByTaker: Record<string, typeof salesOfDay> = {};
+    salesOfDay.forEach((sale) => {
+      if (!salesByTaker[sale.orderTaker]) salesByTaker[sale.orderTaker] = [];
+      salesByTaker[sale.orderTaker].push(sale);
+    });
 
-  // ===== Save PDF =====
-  doc.save(`Sales_Report_${dateStr}.pdf`);
-  toast({ title: "PDF Downloaded", description: "Sales report downloaded successfully." });
-};
+    let currentY = 30 + imgHeight;
+
+    for (const [taker, takerSales] of Object.entries(salesByTaker)) {
+      doc.setFontSize(14);
+      doc.text(`Order Taker: ${taker}`, 14, currentY);
+      currentY += 6;
+
+      const tableData = takerSales.map((sale) => [
+        formatDate(sale.date),
+        sale.orderType,
+        sale.items
+          .map((it: any) =>
+            it.plateType
+              ? `${it.name} (${it.plateType} × ${it.quantity})`
+              : `${it.name} (${it.quantity})`
+          )
+          .join(", "),
+        sale.paymentMethod,
+        sale.total.toFixed(2),
+      ]);
+
+      autoTable(doc, {
+        head: [["Date", "Type", "Items", "Payment", "Total (PKR)"]],
+        body: tableData,
+        startY: currentY,
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [253, 186, 116] },
+        theme: "grid",
+      });
+
+      currentY = (doc as any).lastAutoTable.finalY + 6;
+
+      const takerRevenue = takerSales.reduce((sum, sale) => sum + sale.total, 0);
+      doc.setFontSize(12);
+      doc.text(`Total Revenue for ${taker}: ${takerRevenue.toFixed(2)} PKR`, 14, currentY);
+      currentY += 10;
+    }
+
+    const totalRevenue = salesOfDay.reduce((sum, sale) => sum + sale.total, 0);
+    doc.setFontSize(14);
+    doc.text(`Overall Total Revenue: ${totalRevenue.toFixed(2)} PKR`, 14, currentY);
+
+    doc.save(`Sales_Report_${dateStr}.pdf`);
+    toast({ title: "PDF Downloaded", description: "Sales report downloaded successfully." });
+  };
 
 
   return (
@@ -537,7 +561,7 @@ const downloadSalesPDF = (dateStr: string) => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-semibold text-black">
-                           Rs. {sale.total?.toLocaleString()}
+                          Rs. {sale.total?.toLocaleString()}
                         </TableCell>
                         <TableCell className="flex justify-center gap-2">
                           <Button
@@ -889,23 +913,23 @@ const downloadSalesPDF = (dateStr: string) => {
 
               <DialogFooter className="mt-4 border-t pt-3 flex items-center justify-between">
                 <div className="text-sm font-medium text-gray-700">
-  کل رقم:{" "}
-  <span className="text-orange-600 font-semibold">
-    Rs.{" "}
-    {editingSale.items
-      .reduce((acc, it) => {
-        let itemPrice = it.price || 0;
+                  کل رقم:{" "}
+                  <span className="text-orange-600 font-semibold">
+                    Rs.{" "}
+                    {editingSale.items
+                      .reduce((acc, it) => {
+                        let itemPrice = it.price || 0;
 
-        // ✅ Half Plate adjustment
-        if (it.plateType === "Half Plate") {
-          itemPrice = itemPrice / 2;
-        }
+                        // ✅ Half Plate adjustment
+                        if (it.plateType === "Half Plate") {
+                          itemPrice = itemPrice / 2;
+                        }
 
-        return acc + itemPrice * (it.quantity || 1);
-      }, 0)
-      .toLocaleString()}
-  </span>
-</div>
+                        return acc + itemPrice * (it.quantity || 1);
+                      }, 0)
+                      .toLocaleString()}
+                  </span>
+                </div>
 
 
                 <Button

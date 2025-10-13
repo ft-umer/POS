@@ -136,7 +136,8 @@ const POSInterface = () => {
         </style>
       </head>
       <body>
-      <img src="logo.png" alt="Logo" style="width:90px; height:auto; margin-bottom:10px;" />
+      <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png"
+      alt="Logo" style="width:90px; height:auto; margin-bottom:10px;" />
         <h2>Tahir Fruit Chaat</h2>
         <p>${date}</p>
         <div class="separator"></div>
@@ -242,8 +243,8 @@ const POSInterface = () => {
                     <Card
                       key={product.id}
                       className={`cursor-pointer border rounded-xl transition-all ${isOutOfStock
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:border-[#ff6600] hover:shadow-lg"
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:border-[#ff6600] hover:shadow-lg"
                         }`}
                       onClick={() => {
                         if (isOutOfStock) return; // ❌ Prevent adding to cart if out of stock
@@ -287,7 +288,7 @@ const POSInterface = () => {
                         <h3 className="font-semibold text-sm truncate text-black">
                           {product.name}
                         </h3>
-                        <p className="text-xs text-gray-500">{product.category}</p>
+                        <p className="text-xs text-gray-500">Tahir Fruit Chaat</p>
                         <div className="flex justify-between items-center mt-2">
                           <span className="font-bold text-[#ff6600]">{product.price} PKR</span>
                           <span
@@ -409,7 +410,7 @@ const POSInterface = () => {
                 <div className="space-y-4">
                   {cart.map((item) => {
                     const isOutOfStock = item.quantity >= item.stock;
-                   
+
 
                     return (
                       <div
@@ -434,7 +435,7 @@ const POSInterface = () => {
                                   Out of Stock
                                 </span>
                               )}
-                             
+
                             </p>
                             <p className="text-sm text-gray-500">
                               {item.price} PKR × {item.quantity}
@@ -472,7 +473,7 @@ const POSInterface = () => {
                             size="icon"
                             disabled={isOutOfStock}
                             onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                          
+
                             className="border-gray-300 hover:border-[#ff6600] hover:bg-[#ff6600]/10"
                           >
                             <Plus className="h-4 w-4" />
@@ -552,51 +553,32 @@ const POSInterface = () => {
                 </span>
               </div>
               <div className="flex gap-3 mt-3">
-                <Button
-                  variant={selectedPlate === "Full Plate" ? "default" : "outline"}
-                  className={`flex-1 ${selectedPlate === "Full Plate"
-                    ? "bg-[#ff6600] text-white"
-                    : "border-gray-300 text-black hover:border-[#ff6600]"
-                    }`}
-                  onClick={() => {
-                    const finalProduct = {
-                      ...selectedProduct,
-                      price:
-                        selectedPlate === "Half Plate"
-                          ? selectedProduct.price / 2
-                          : selectedProduct.price,
-                      plateType: selectedPlate,
-                    };
-                    addToCart(finalProduct);
-                    setSelectedProduct(null);
-                    setSelectedPlate("Full Plate");
-                  }}
-                >
-                  Full Plate
-                </Button>
-                <Button
-                  variant={selectedPlate === "Half Plate" ? "default" : "outline"}
-                  className={`flex-1 ${selectedPlate === "Half Plate"
-                    ? "bg-[#ff6600] text-white"
-                    : "border-gray-300 text-black hover:border-[#ff6600]"
-                    }`}
-                  onClick={() => {
-                    const finalProduct = {
-                      ...selectedProduct,
-                      price:
-                        selectedPlate === "Half Plate"
-                          ? selectedProduct.price / 2
-                          : selectedProduct.price,
-                      plateType: selectedPlate,
-                    };
-                    addToCart(finalProduct);
-                    setSelectedProduct(null);
-                    setSelectedPlate("Half Plate");
-                  }}
-                >
-                  Half Plate
-                </Button>
+                {["Full Plate", "Half Plate"].map((type) => (
+                  <Button
+                    key={type}
+                    variant={selectedPlate === type ? "default" : "outline"}
+                    className={`flex-1 ${selectedPlate === type
+                        ? "bg-[#ff6600] text-white"
+                        : "border-gray-300 text-black hover:border-[#ff6600]"
+                      }`}
+                    onClick={() => {
+                      const price =
+                        type === "Half Plate" ? selectedProduct.price / 2 : selectedProduct.price;
+                      const finalProduct = {
+                        ...selectedProduct,
+                        price,
+                        plateType: type,
+                      };
+                      addToCart(finalProduct);
+                      setSelectedProduct(null);
+                      setSelectedPlate("Full Plate"); // reset dialog
+                    }}
+                  >
+                    {type}
+                  </Button>
+                ))}
               </div>
+
             </div>
           </DialogContent>
         </Dialog>
