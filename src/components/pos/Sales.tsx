@@ -424,7 +424,7 @@ const downloadSalesPDF = (dateStr: string) => {
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
-                                    Rs. {sale.totalPrice?.toLocaleString()}
+                                    Rs. {sale.total?.toLocaleString()}
                                   </TableCell>
 
                                   <TableCell className="flex justify-center gap-2">
@@ -543,7 +543,7 @@ const downloadSalesPDF = (dateStr: string) => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-semibold text-black">
-                           Rs. {sale.totalPrice?.toLocaleString()}
+                           Rs. {sale.total?.toLocaleString()}
                         </TableCell>
                         <TableCell className="flex justify-center gap-2">
                           <Button
@@ -739,7 +739,7 @@ const downloadSalesPDF = (dateStr: string) => {
                                   return acc + itemPrice * (it.quantity || 1);
                                 }, 0);
 
-                                setEditingSale({ ...editingSale, items: newItems, totalPrice: newTotal });
+                                setEditingSale({ ...editingSale, items: newItems, total: newTotal });
                               }}
                             >
                               <SelectTrigger className="w-[120px]">
@@ -768,7 +768,7 @@ const downloadSalesPDF = (dateStr: string) => {
                                 0
                               );
 
-                              setEditingSale({ ...editingSale, items: newItems, totalPrice: newTotal });
+                              setEditingSale({ ...editingSale, items: newItems, total: newTotal });
                             }}
                             className="w-20 text-center"
                           />
@@ -805,7 +805,7 @@ const downloadSalesPDF = (dateStr: string) => {
                                 }, 0);
 
 
-                                setEditingSale({ ...editingSale, items: newItems, totalPrice: newTotal });
+                                setEditingSale({ ...editingSale, items: newItems, total: newTotal });
 
                               }
                             }}
@@ -829,7 +829,7 @@ const downloadSalesPDF = (dateStr: string) => {
                               setEditingSale({
                                 ...editingSale,
                                 items: newItems,
-                                totalPrice: newItems.reduce(
+                                total: newItems.reduce(
                                   (acc, it) => acc + (it.price || 0) * (it.quantity || 1),
                                   0
                                 ),
@@ -880,7 +880,7 @@ const downloadSalesPDF = (dateStr: string) => {
                           0
                         );
 
-                        setEditingSale({ ...editingSale, items: newItems, totalPrice: newTotal });
+                        setEditingSale({ ...editingSale, items: newItems, total: newTotal });
                       }}
 
                       className="text-orange-600 text-sm font-medium hover:underline"
