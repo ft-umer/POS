@@ -111,6 +111,7 @@ const Sales = () => {
   const getSalesByDate = (dateStr: string) =>
     sales.filter((sale) => new Date(sale.date).toDateString() === new Date(dateStr).toDateString());
 
+// Place this function inside your Sales component, replacing the old downloadSalesPDF
 const downloadSalesPDF = (dateStr: string) => {
   const salesOfDay = getSalesByDate(dateStr);
 
@@ -121,62 +122,55 @@ const downloadSalesPDF = (dateStr: string) => {
 
   const doc = new jsPDF();
 
-  // Add Logo
-  const logoUrl = "/logo.png"; // replace with your logo path
-  const img = new Image();
-  img.src = logoUrl;
-  img.onload = () => {
-    const imgWidth = 40;
-    const imgHeight = (img.height / img.width) * imgWidth;
-    doc.addImage(img, "PNG", 14, 10, imgWidth, imgHeight);
+  // ===== Base64 Logo (offline-friendly) =====
+ 
+  const imgWidth = 35;
+  const imgHeight = 35; // adjust if needed
+  doc.addImage("https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png", "PNG", 14, 10, imgWidth, imgHeight);
 
-    // Header
-    doc.setFontSize(16);
-    doc.text(
-      `Sales Report - ${new Date(dateStr).toLocaleDateString()}`,
-      14 + imgWidth + 10,
-      20
-    );
-    doc.setFontSize(12);
+  // ===== Header =====
+  doc.setFontSize(16);
+  doc.text(`Sales Report - ${new Date(dateStr).toLocaleDateString()}`, 14 + imgWidth + 10, 20);
+  doc.setFontSize(12);
 
-    // Table Data
-    const tableData = salesOfDay.map((sale) => [
-      formatDate(sale.date),
-      sale.orderTaker,
-      sale.orderType,
-      sale.items
-        .map((it: any) =>
-          it.plateType
-            ? `${it.name} (${it.plateType} × ${it.quantity})`
-            : `${it.name} (${it.quantity})`
-        )
-        .join(", "),
-      sale.paymentMethod,
-      sale.total.toFixed(2),
-    ]);
+  // ===== Table Data =====
+  const tableData = salesOfDay.map((sale) => [
+    formatDate(sale.date),
+    sale.orderTaker,
+    sale.orderType,
+    sale.items
+      .map((it: any) =>
+        it.plateType
+          ? `${it.name} (${it.plateType} × ${it.quantity})`
+          : `${it.name} (${it.quantity})`
+      )
+      .join(", "),
+    sale.paymentMethod,
+    sale.total.toFixed(2),
+  ]);
 
-    // Generate table using autoTable
-    autoTable(doc, {
-      head: [["Date", "Order Taker", "Type", "Items", "Payment", "Total (PKR)"]],
-      body: tableData,
-      startY: 30 + imgHeight, // push table below logo
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [253, 186, 116] }, // orange
-    });
+  // ===== AutoTable =====
+  autoTable(doc, {
+    head: [["Date", "Order Taker", "Type", "Items", "Payment", "Total (PKR)"]],
+    body: tableData,
+    startY: 30 + imgHeight,
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [253, 186, 116] }, // orange
+  });
 
-    // Total Revenue
-    const totalDayRevenue = salesOfDay.reduce((sum, sale) => sum + sale.total, 0);
-    doc.text(
-      `Total Revenue: ${totalDayRevenue.toFixed(2)} PKR`,
-      14,
-      (doc as any).lastAutoTable.finalY + 10
-    );
+  // ===== Total Revenue =====
+  const totalDayRevenue = salesOfDay.reduce((sum, sale) => sum + sale.total, 0);
+  doc.text(
+    `Total Revenue: ${totalDayRevenue.toFixed(2)} PKR`,
+    14,
+    (doc as any).lastAutoTable.finalY + 10
+  );
 
-    // Save PDF
-    doc.save(`Sales_Report_${dateStr}.pdf`);
-    toast({ title: "PDF Downloaded", description: "Sales report downloaded successfully." });
-  };
+  // ===== Save PDF =====
+  doc.save(`Sales_Report_${dateStr}.pdf`);
+  toast({ title: "PDF Downloaded", description: "Sales report downloaded successfully." });
 };
+
 
   return (
     <div className="space-y-6 sm:space-y-8 bg-white text-gray-900">
