@@ -145,11 +145,16 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
 
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem("pos_sales");
-    return saved ? JSON.parse(saved) : [];
-  });
+ const getSavedSales = () => {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem("pos_sales") || "[]");
+  } catch {
+    return [];
+  }
+};
 
+const [sales, setSales] = useState<Sale[]>(getSavedSales);
 
   const [orderTakers, setOrderTakers] = useState<OrderTaker[]>(() => {
     const saved = localStorage.getItem("pos_orderTakers");
