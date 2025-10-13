@@ -155,7 +155,7 @@ const POSInterface = () => {
         </table>
         <div class="separator"></div>
         <p>Order Type: ${orderType}</p>
-        <p>Order Taker: ${orderTaker}</p>
+        <p>Order Taker: ${currentTaker.name}</p>
         <p>Payment: ${paymentMethod}</p>
         <div class="footer">
           <p>Thank you for your purchase!</p>
@@ -234,55 +234,74 @@ const POSInterface = () => {
             </div>
 
             <ScrollArea className="h-[420px] md:h-[500px]">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {filteredProducts.map((product) => (
-                  <Card
-                    key={product.id}
-                    className="cursor-pointer border hover:border-[#ff6600] rounded-xl transition-all hover:shadow-lg"
-                    onClick={() => {
-                      const plateEligibleKeywords = [
-                        "biryani",
-                        "karahi",
-                        "rice",
-                        "bbq",
-                        "meal",
-                      ];
-                      const isEligible = plateEligibleKeywords.some((kw) =>
-                        product.name?.toLowerCase().includes(kw)
-                      );
-                      if (isEligible) {
-                        setSelectedProduct(product);
-                        setSelectedPlate("Full Plate");
-                      } else {
-                        addToCart(product);
-                      }
-                    }}
-                  >
-                    {product.imageUrl && (
-                      <div className="aspect-square overflow-hidden rounded-t-xl">
-                        <img
-                          src={product.imageUrl}
-                          alt={product.name}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform"
-                        />
-                      </div>
-                    )}
-                    <CardContent className="p-3">
-                      <h3 className="font-semibold text-sm truncate text-black">
-                        {product.name}
-                      </h3>
-                      <p className="text-xs text-gray-500">{product.category}</p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="font-bold text-[#ff6600]">
-                          {product.price} PKR
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          Stock: {product.stock}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {filteredProducts.map((product) => {
+                  const isOutOfStock = product.stock <= 0;
+
+                  return (
+                    <Card
+                      key={product.id}
+                      className={`cursor-pointer border rounded-xl transition-all ${isOutOfStock
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:border-[#ff6600] hover:shadow-lg"
+                        }`}
+                      onClick={() => {
+                        if (isOutOfStock) return; // ❌ Prevent adding to cart if out of stock
+
+                        const plateEligibleKeywords = [
+                          "biryani",
+                          "karahi",
+                          "rice",
+                          "bbq",
+                          "meal",
+                        ];
+                        const isEligible = plateEligibleKeywords.some((kw) =>
+                          product.name?.toLowerCase().includes(kw)
+                        );
+
+                        if (isEligible) {
+                          setSelectedProduct(product);
+                          setSelectedPlate("Full Plate");
+                        } else {
+                          addToCart(product);
+                        }
+                      }}
+                    >
+                      {product.imageUrl && (
+                        <div className="aspect-square overflow-hidden rounded-t-xl relative">
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className={`w-full h-full object-cover transition-transform ${!isOutOfStock && "hover:scale-105"
+                              }`}
+                          />
+                          {isOutOfStock && (
+                            <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-red-600 font-bold text-sm">
+                              Out of Stock
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <CardContent className="p-3">
+                        <h3 className="font-semibold text-sm truncate text-black">
+                          {product.name}
+                        </h3>
+                        <p className="text-xs text-gray-500">{product.category}</p>
+                        <div className="flex justify-between items-center mt-2">
+                          <span className="font-bold text-[#ff6600]">{product.price} PKR</span>
+                          <span
+                            className={`text-xs ${isOutOfStock ? "text-red-500" : "text-gray-500"
+                              }`}
+                          >
+                            Stock: {product.stock}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+
               </div>
             </ScrollArea>
           </CardContent>
@@ -331,14 +350,14 @@ const POSInterface = () => {
                       key={taker.id}
                       onClick={() => !isDisabled && setOrderTaker(taker.id)}
                       className={`
-          relative flex flex-col items-center justify-center p-4
-          rounded-2xl border-[2px] backdrop-blur-md transition-all duration-300
-          cursor-pointer overflow-hidden
-          ${isSelected
+                            relative flex flex-col items-center justify-center p-4
+                            rounded-2xl border-[2px] backdrop-blur-md transition-all duration-300
+                            cursor-pointer overflow-hidden
+                            ${isSelected
                           ? "border-[#ff6600] bg-white/60 shadow-xl scale-[1.03]"
                           : "border-transparent bg-white/30 hover:bg-white/50 hover:shadow-md"
                         }
-          ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
+                            ${isDisabled ? "opacity-50 cursor-not-allowed" : ""}
         `}
                     >
                       {/* Image */}
@@ -362,13 +381,13 @@ const POSInterface = () => {
                       </div>
                     </div>
                   );
-                  
-                  
-                  
+
+
+
                 })}
-                
+
               </div>
-             
+
             </div>
           </CardContent>
         </Card>
@@ -388,67 +407,87 @@ const POSInterface = () => {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {cart.map((item) => (
-                    <div key={item.id}>
-                      <div className="flex gap-3 items-start">
-                        {item.imageUrl && (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-16 h-16 object-cover rounded-md"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-black truncate">
-                            {item.name}{" "}
+                  {cart.map((item) => {
+                    const isOutOfStock = item.quantity >= item.stock;
+                   
 
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {item.price} PKR × {item.quantity}
-                          </p>
+                    return (
+                      <div
+                        key={item.id}
+                        className={`relative p-4 mb-3 rounded-2xl border-[1.5px] backdrop-blur-md transition-all`}
+                      >
+                        {/* Header Row */}
+                        <div className="flex gap-3 items-start">
+                          {item.imageUrl && (
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-16 h-16 object-cover rounded-xl border border-[#ff6600]/30"
+                            />
+                          )}
+
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-black truncate flex items-center gap-2">
+                              {item.name}
+                              {isOutOfStock && (
+                                <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
+                                  Out of Stock
+                                </span>
+                              )}
+                             
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {item.price} PKR × {item.quantity}
+                            </p>
+                          </div>
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeFromCart(item.id)}
+                            className="text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeFromCart(item.id)}
-                          className="text-gray-500 hover:text-red-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
 
-                      <div className="flex items-center gap-2 mt-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() =>
-                            updateCartQuantity(item.id, item.quantity - 1)
-                          }
-                          className="border-gray-300 hover:border-[#ff6600]"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="w-10 text-center font-medium">
-                          {item.quantity}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() =>
-                            updateCartQuantity(item.id, item.quantity + 1)
-                          }
-                          className="border-gray-300 hover:border-[#ff6600]"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        <span className="ml-auto font-semibold text-[#ff6600]">
-                          {(item.price * item.quantity).toFixed(2)} PKR
-                        </span>
-                      </div>
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-2 mt-3">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={item.quantity <= 1}
+                            onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                            className="border-gray-300 hover:border-[#ff6600] hover:bg-[#ff6600]/10"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
 
-                      <Separator className="my-3" />
-                    </div>
-                  ))}
+                          <span className="w-10 text-center font-semibold text-gray-800">
+                            {item.quantity}
+                          </span>
+
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={isOutOfStock}
+                            onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                          
+                            className="border-gray-300 hover:border-[#ff6600] hover:bg-[#ff6600]/10"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+
+                          <span className="ml-auto font-semibold text-[#ff6600]">
+                            {(item.price * item.quantity).toFixed(2)} PKR
+                          </span>
+                        </div>
+
+                        <Separator className="my-3" />
+                      </div>
+                    );
+                  })}
+
                 </div>
               )}
             </ScrollArea>

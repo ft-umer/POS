@@ -168,24 +168,31 @@ const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
     const existingSale = prevSales.find((sale) => sale.id === saleId);
     if (!existingSale) return prevSales;
 
+    // Create updated sale
     const updatedSale = { ...existingSale, ...updatedData };
-    const newTotal = updatedSale.total ?? existingSale.total;
 
-    // 🚫 Skip if no change in total
-    if (newTotal === existingSale.total) return prevSales;
+    // Compute total difference only if total is changed
+    const oldTotal = existingSale.total ?? 0;
+    const newTotal = updatedSale.total ?? oldTotal;
+    const totalDiff = newTotal - oldTotal;
 
-    const totalDiff = newTotal - existingSale.total;
-    if (totalDiff === 0) return prevSales;
+    // If nothing changed, skip
+    if (totalDiff === 0 && JSON.stringify(updatedSale) === JSON.stringify(existingSale)) {
+      return prevSales;
+    }
 
-    // 💰 Adjust balance
-    setOrderTakers((prevTakers) =>
-      prevTakers.map((taker) =>
-        taker.name === existingSale.orderTaker
-          ? { ...taker, balance: taker.balance - totalDiff }
-          : taker
-      )
-    );
+    // Update the order taker balances separately AFTER returning new sales
+    setTimeout(() => {
+      setOrderTakers((prevTakers) =>
+        prevTakers.map((taker) =>
+          taker.name === existingSale.orderTaker
+            ? { ...taker, balance: taker.balance - totalDiff }
+            : taker
+        )
+      );
+    }, 0);
 
+    // Update sales in state and localStorage
     const updatedSales = prevSales.map((sale) =>
       sale.id === saleId ? updatedSale : sale
     );
@@ -194,6 +201,7 @@ const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
     return updatedSales;
   });
 };
+
 
 
 
