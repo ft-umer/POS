@@ -1,22 +1,19 @@
+"use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import zingerBurgerImg from "@/assets/products/zinger-burger.jpg";
-import chickenTikkaImg from "@/assets/products/chicken-tikka.jpg";
-import biryaniImg from "@/assets/products/biryani.jpg";
-import samosaImg from "@/assets/products/samosa.jpg";
-import chaiImg from "@/assets/products/chai.jpg";
-import coldDrinkImg from "@/assets/products/cold-drink.jpg";
+import axios from "axios";
 
 // ======================
 // Interfaces
 // ======================
 export interface Product {
-  id: string;
+  _id?: string;
   name: string;
   price: number;
   stock: number;
   barcode?: string;
-  imageUrl?: string;
   plateType?: string;
+  imageUrl?: string;
+  createdAt?: string;
 }
 
 export type OrderType = "Dine In" | "Take Away" | "Drive Thru" | "Delivery";
@@ -32,14 +29,14 @@ export interface Sale {
   date: string;
   paymentMethod: string;
   orderType: OrderType;
-  orderTaker: string; // name only
+  orderTaker: string;
 }
 
 export interface OrderTaker {
   id: string;
   name: string;
   phone: string;
-  balance: number; // 💰 amount available to take orders
+  balance: number;
   imageUrl?: string;
 }
 
@@ -51,199 +48,171 @@ interface POSContextType {
   cart: CartItem[];
   sales: Sale[];
   orderTakers: OrderTaker[];
+
+  addProduct: (formData: FormData) => Promise<void>;
+  updateProduct: (id: string, product: Partial<Product>) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
+  reloadProducts: () => Promise<void>;
+  reloadSales: () => Promise<void>;
+
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateCartQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
-  completeSale: (
-    paymentMethod: string,
-    orderType: OrderType,
-    orderTaker: string
-  ) => void;
-  addProduct: (product: Omit<Product, "id">) => void;
-  updateProduct: (id: string, product: Partial<Product>) => void;
-  deleteProduct: (id: string) => void;
+
+  completeSale: (paymentMethod: string, orderType: OrderType, orderTakerId: string) => void;
+  updateSale: (saleId: string, updatedData: Partial<Sale>) => void;
+  deleteSale: (saleId: string) => void;
+
   addOrderTaker: (taker: Omit<OrderTaker, "id">) => void;
   updateOrderTaker: (id: string, taker: Partial<OrderTaker>) => void;
   deleteOrderTaker: (id: string) => void;
-  updateSale: (saleId: string, updatedData: any) => void;
-  deleteSale: (saleId: string) => void;
 }
 
-
-// ======================
-// Default Data
-// ======================
 const POSContext = createContext<POSContextType | undefined>(undefined);
-
-const initialProducts: Product[] = [
-  {
-    id: "1",
-    name: "زنگر برگر",
-    price: 350,
-    stock: 50,
-    barcode: "123456",
-    imageUrl: zingerBurgerImg,
-  },
-  {
-    id: "2",
-    name: "چکن تکہ",
-    price: 280,
-    stock: 30,
-    barcode: "123457",
-    imageUrl: chickenTikkaImg,
-  },
-  {
-    id: "3",
-    name: "بریانی",
-    price: 320,
-    stock: 40,
-    barcode: "123458",
-    imageUrl: biryaniImg,
-  },
-  {
-    id: "4",
-    name: "سموسہ",
-    price: 30,
-    stock: 100,
-    barcode: "123459",
-    imageUrl: samosaImg,
-  },
-  {
-    id: "5",
-    name: "چائے",
-    price: 50,
-    stock: 200,
-    barcode: "123460",
-    imageUrl: chaiImg,
-  },
-  {
-    id: "6",
-    name: "کولڈ ڈرنک",
-    price: 80,
-    stock: 150,
-    barcode: "123461",
-    imageUrl: coldDrinkImg,
-  },
-];
-
 
 // ======================
 // Provider
 // ======================
 export const POSProvider = ({ children }: { children: ReactNode }) => {
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem("pos_products");
-    return saved ? JSON.parse(saved) : initialProducts;
-  });
+  // 🧠 Dynamically detect backend URL
+  const BASE_URL = "https://pos-backend-kappa.vercel.app";
 
+  const PRODUCTS_URL = `${BASE_URL}/products`;
+  const SALES_URL = `${BASE_URL}/sales`;
+
+  // --------------------
+  // States
+  // --------------------
+  const [products, setProducts] = useState<Product[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
-
   const [sales, setSales] = useState<Sale[]>(() => {
     const saved = localStorage.getItem("pos_sales");
     return saved ? JSON.parse(saved) : [];
   });
-
-
   const [orderTakers, setOrderTakers] = useState<OrderTaker[]>(() => {
     const saved = localStorage.getItem("pos_orderTakers");
     return saved
       ? JSON.parse(saved)
       : [
-        { id: "1", name: "Ahmad", phone: "03001234567", balance: 5000 },
-        { id: "2", name: "Sara", phone: "03002345678", balance: 3000 },
-        { id: "3", name: "Hassan", phone: "03003456789", balance: 7000 },
-      ];
+          { id: "1", name: "Ahmad", phone: "03001234567", balance: 5000 },
+          { id: "2", name: "Sara", phone: "03002345678", balance: 3000 },
+          { id: "3", name: "Hassan", phone: "03003456789", balance: 7000 },
+        ];
   });
 
-
-const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
-  setSales((prevSales) => {
-    const existingSale = prevSales.find((sale) => sale.id === saleId);
-    if (!existingSale) return prevSales;
-
-    // Create updated sale
-    const updatedSale = { ...existingSale, ...updatedData };
-
-    // Compute total difference only if total is changed
-    const oldTotal = existingSale.total ?? 0;
-    const newTotal = updatedSale.total ?? oldTotal;
-    const totalDiff = newTotal - oldTotal;
-
-    // If nothing changed, skip
-    if (totalDiff === 0 && JSON.stringify(updatedSale) === JSON.stringify(existingSale)) {
-      return prevSales;
+  // 🔒 Safe axios wrapper
+  const safeRequest = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await fn();
+    } catch (err) {
+      console.warn("⚠️ Offline mode or API error:", err);
+      return null;
     }
-
-    // Update the order taker balances separately AFTER returning new sales
-    setTimeout(() => {
-      setOrderTakers((prevTakers) =>
-        prevTakers.map((taker) =>
-          taker.name === existingSale.orderTaker
-            ? { ...taker, balance: taker.balance - totalDiff }
-            : taker
-        )
-      );
-    }, 0);
-
-    // Update sales in state and localStorage
-    const updatedSales = prevSales.map((sale) =>
-      sale.id === saleId ? updatedSale : sale
-    );
-
-    localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
-    return updatedSales;
-  });
-};
-
-
-
-
-  const deleteSale = (saleId: string) => {
-    setSales((prevSales) => {
-      const saleToDelete = prevSales.find((sale) => sale.id === saleId);
-      if (!saleToDelete) return prevSales;
-
-      // 💰 Refund the sale amount to the order taker
-      setOrderTakers((prevTakers) =>
-        prevTakers.map((taker) =>
-          taker.name === saleToDelete.orderTaker
-            ? { ...taker, balance: taker.balance + saleToDelete.total }
-            : taker
-        )
-      );
-
-      const updatedSales = prevSales.filter((sale) => sale.id !== saleId);
-      localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
-      return updatedSales;
-    });
   };
 
+  // ============================
+  // Product Fetch (Online + Offline)
+  // ============================
+  const reloadProducts = async () => {
+    const res = await safeRequest(() => axios.get(PRODUCTS_URL));
+    if (res && res.data) {
+      setProducts(res.data);
+      localStorage.setItem("pos_products", JSON.stringify(res.data));
+    } else {
+      const saved = localStorage.getItem("pos_products");
+      if (saved) setProducts(JSON.parse(saved));
+    }
+  };
 
-  // ======================
-  // Persist data
-  // ======================
   useEffect(() => {
-    localStorage.setItem("pos_products", JSON.stringify(products));
-  }, [products]);
+    reloadProducts();
+  }, []);
+  
+  
+  // ============================
+// Sales Fetch (Online + Offline)
+// ============================
+const reloadSales = async () => {
+  const res = await safeRequest(() => axios.get(SALES_URL));
 
-  useEffect(() => {
-    localStorage.setItem("pos_sales", JSON.stringify(sales));
-  }, [sales]);
+  if (res && res.data) {
+    // 🧠 Map sales so that each item includes product name, price, etc.
+    const mappedSales = res.data.map((sale: any) => ({
+      id: sale._id,
+      total: sale.total,
+      paymentMethod: sale.paymentMethod,
+      orderType: sale.orderType,
+      orderTaker: sale.orderTaker,
+      date: sale.createdAt,
+      items: sale.items.map((item: any) => ({
+        productId: item.productId?._id || item.productId,
+        name: item.productId?.name || "Unknown Product",
+        price: item.productId?.price || item.price,
+        imageUrl: item.productId?.imageUrl,
+        plateType: item.productId?.plateType,
+        quantity: item.quantity,
+      })),
+    }));
 
-  useEffect(() => {
-    localStorage.setItem("pos_orderTakers", JSON.stringify(orderTakers));
-  }, [orderTakers]);
+    setSales(mappedSales);
+    localStorage.setItem("pos_sales", JSON.stringify(mappedSales));
+  } else {
+    // Offline mode fallback
+    const saved = localStorage.getItem("pos_sales");
+    if (saved) setSales(JSON.parse(saved));
+  }
+};
 
-  // ======================
-  // Cart functions
-  // ======================
+// 🔄 Load sales when app starts
+useEffect(() => {
+  reloadSales();
+}, []);
+
+
+  // ============================
+  // Product CRUD
+  // ============================
+  const addProduct = async (formData: FormData) => {
+    const res = await safeRequest(() =>
+      axios.post(PRODUCTS_URL, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+    );
+    if (res && res.data) {
+      const updated = [res.data, ...products];
+      setProducts(updated);
+      localStorage.setItem("pos_products", JSON.stringify(updated));
+    }
+  };
+
+  const updateProduct = async (id: string, product: Partial<Product>) => {
+    const res = await safeRequest(() => axios.put(`${PRODUCTS_URL}/${id}`, product));
+    if (res && res.data) {
+      const updated = products.map((p) => (p._id === id ? res.data : p));
+      setProducts(updated);
+      localStorage.setItem("pos_products", JSON.stringify(updated));
+    }
+  };
+
+  const deleteProduct = async (id: string) => {
+    const res = await safeRequest(() => axios.delete(`${PRODUCTS_URL}/${id}`));
+    if (res !== null) {
+      const updated = products.filter((p) => p._id !== id);
+      setProducts(updated);
+      localStorage.setItem("pos_products", JSON.stringify(updated));
+    }
+  };
+
+  // ============================
+  // Cart Management
+  // ============================
   const addToCart = (product: Product) => {
     setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
+      const existing = prev.find((item) => item._id === product._id);
       if (existing) {
         return prev.map((item) =>
-          item.id === product.id
+          item._id === product._id
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
@@ -252,120 +221,145 @@ const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
     });
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.id !== productId));
-  };
+  const removeFromCart = (productId: string) =>
+    setCart((prev) => prev.filter((item) => item._id !== productId));
 
   const updateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
-      return;
-    }
+    if (quantity <= 0) return removeFromCart(productId);
     setCart((prev) =>
       prev.map((item) =>
-        item.id === productId ? { ...item, quantity } : item
+        item._id === productId ? { ...item, quantity } : item
       )
     );
   };
 
   const clearCart = () => setCart([]);
 
-  // ======================
-  // Complete Sale
-  // ======================
-  const completeSale = (
+  // ============================
+  // Complete Sale (Online + Offline)
+  // ============================
+  const completeSale = async (
     paymentMethod: string,
     orderType: OrderType,
     orderTakerId: string
   ) => {
     const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
     const taker = orderTakers.find((t) => t.id === orderTakerId);
-    if (!taker) {
-      alert("Invalid order taker selected.");
-      return;
-    }
 
-    // 🚫 Check balance
-    if (taker.balance < total) {
-      alert(`${taker.name} has insufficient balance to take this order.`);
-      return;
-    }
+    if (!taker) return alert("Invalid order taker selected.");
+    if (taker.balance < total)
+      return alert(`${taker.name} has insufficient balance.`);
 
-    // ✅ Create the sale
-    const sale: Sale = {
-      id: Date.now().toString(),
-      items: cart,
+    const salePayload = {
+      items: cart.map((item) => ({
+        productId: item._id,
+        quantity: item.quantity,
+        price: item.price,
+      })),
       total,
-      date: new Date().toISOString(),
       paymentMethod,
       orderType,
       orderTaker: taker.name,
     };
 
-    setSales((prev) => [sale, ...prev]);
+    const res = await safeRequest(() => axios.post(SALES_URL, salePayload));
 
-    // 🧮 Deduct balance from the order taker
+    if (res && res.data) {
+      const newSale: Sale = {
+        ...res.data,
+        id: res.data._id,
+        date: res.data.createdAt,
+      };
+      const updatedSales = [newSale, ...sales];
+      setSales(updatedSales);
+      localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
+      alert("✅ Sale completed successfully (Online).");
+    } else {
+      const offlineSale: Sale = {
+        id: Date.now().toString(),
+        items: cart,
+        total,
+        date: new Date().toISOString(),
+        paymentMethod,
+        orderType,
+        orderTaker: taker.name,
+      };
+      const updatedSales = [offlineSale, ...sales];
+      setSales(updatedSales);
+      localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
+      alert("✅ Sale saved offline (will sync later).");
+    }
+
     setOrderTakers((prev) =>
       prev.map((t) =>
         t.id === orderTakerId ? { ...t, balance: t.balance - total } : t
       )
     );
-
-    // 📉 Update product stock
     setProducts((prev) =>
-      prev.map((product) => {
-        const cartItem = cart.find((item) => item.id === product.id);
-        if (cartItem) {
-          return { ...product, stock: product.stock - cartItem.quantity };
-        }
-        return product;
+      prev.map((p) => {
+        const cartItem = cart.find((c) => c._id === p._id);
+        return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
       })
     );
-
     clearCart();
   };
 
-
-  // ======================
-  // Product CRUD
-  // ======================
-  const addProduct = (product: Omit<Product, "id">) => {
-    const newProduct: Product = { ...product, id: Date.now().toString() };
-    setProducts((prev) => [...prev, newProduct]);
-  };
-
-  const updateProduct = (id: string, updated: Partial<Product>) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updated } : p))
+  // ============================
+  // Update & Delete Sale (Online + Offline)
+  // ============================
+  const updateSale = async (saleId: string, updatedData: Partial<Sale>) => {
+    const res = await safeRequest(() => axios.put(`${SALES_URL}/${saleId}`, updatedData));
+    const updatedSales = sales.map((s) =>
+      s.id === saleId ? { ...s, ...(res?.data || updatedData) } : s
     );
+    setSales(updatedSales);
+    localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
   };
 
-  const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  const deleteSale = async (saleId: string) => {
+    await safeRequest(() => axios.delete(`${SALES_URL}/${saleId}`));
+    const saleToDelete = sales.find((s) => s.id === saleId);
+    const updatedSales = sales.filter((s) => s.id !== saleId);
+    setSales(updatedSales);
+    localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
+    if (saleToDelete) {
+      setOrderTakers((prev) =>
+        prev.map((t) =>
+          t.name === saleToDelete.orderTaker
+            ? { ...t, balance: t.balance + saleToDelete.total }
+            : t
+        )
+      );
+    }
   };
 
-  // ======================
+  // ============================
   // Order Taker CRUD
-  // ======================
+  // ============================
   const addOrderTaker = (taker: Omit<OrderTaker, "id">) => {
     const newTaker: OrderTaker = { ...taker, id: Date.now().toString() };
-    setOrderTakers((prev) => [...prev, newTaker]);
+    const updated = [...orderTakers, newTaker];
+    setOrderTakers(updated);
+    localStorage.setItem("pos_orderTakers", JSON.stringify(updated));
   };
 
   const updateOrderTaker = (id: string, updated: Partial<OrderTaker>) => {
-    setOrderTakers((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updated } : t))
+    const updatedTakers = orderTakers.map((t) =>
+      t.id === id ? { ...t, ...updated } : t
     );
+    setOrderTakers(updatedTakers);
+    localStorage.setItem("pos_orderTakers", JSON.stringify(updatedTakers));
   };
 
   const deleteOrderTaker = (id: string) => {
-    setOrderTakers((prev) => prev.filter((t) => t.id !== id));
+    const updated = orderTakers.filter((t) => t.id !== id);
+    setOrderTakers(updated);
+    localStorage.setItem("pos_orderTakers", JSON.stringify(updated));
   };
 
-  // ======================
-  // Return Context
-  // ======================
+  // ============================
+  // Return
+  // ============================
   return (
     <POSContext.Provider
       value={{
@@ -373,19 +367,21 @@ const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
         cart,
         sales,
         orderTakers,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        reloadProducts,
         addToCart,
         removeFromCart,
         updateCartQuantity,
         clearCart,
         completeSale,
-        addProduct,
-        updateProduct,
-        deleteProduct,
+        updateSale,
+        deleteSale,
         addOrderTaker,
         updateOrderTaker,
         deleteOrderTaker,
-        updateSale,
-        deleteSale,
+        reloadSales,
       }}
     >
       {children}
@@ -398,8 +394,6 @@ const updateSale = (saleId: string, updatedData: Partial<Sale>) => {
 // ======================
 export const usePOS = () => {
   const context = useContext(POSContext);
-  if (!context) {
-    throw new Error("usePOS must be used within POSProvider");
-  }
+  if (!context) throw new Error("usePOS must be used within POSProvider");
   return context;
 };

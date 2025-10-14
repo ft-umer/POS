@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { usePOS, OrderType, OrderTaker } from "@/contexts/POSContext";
+import { usePOS, OrderType } from "@/contexts/POSContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -241,7 +241,7 @@ const POSInterface = () => {
 
                   return (
                     <Card
-                      key={product.id}
+                      key={product._id}
                       className={`cursor-pointer border rounded-xl transition-all ${isOutOfStock
                         ? "opacity-50 cursor-not-allowed"
                         : "hover:border-[#ff6600] hover:shadow-lg"
@@ -414,7 +414,7 @@ const POSInterface = () => {
 
                     return (
                       <div
-                        key={item.id}
+                        key={item._id}
                         className={`relative p-4 mb-3 rounded-2xl border-[1.5px] backdrop-blur-md transition-all`}
                       >
                         {/* Header Row */}
@@ -445,7 +445,7 @@ const POSInterface = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => removeFromCart(item.id)}
+                            onClick={() => removeFromCart(item._id)}
                             className="text-gray-400 hover:text-red-500 transition-colors"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -458,7 +458,7 @@ const POSInterface = () => {
                             variant="outline"
                             size="icon"
                             disabled={item.quantity <= 1}
-                            onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                            onClick={() => updateCartQuantity(item._id, item.quantity - 1)}
                             className="border-gray-300 hover:border-[#ff6600] hover:bg-[#ff6600]/10"
                           >
                             <Minus className="h-4 w-4" />
@@ -472,7 +472,7 @@ const POSInterface = () => {
                             variant="outline"
                             size="icon"
                             disabled={isOutOfStock}
-                            onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                            onClick={() => updateCartQuantity(item._id, item.quantity + 1)}
 
                             className="border-gray-300 hover:border-[#ff6600] hover:bg-[#ff6600]/10"
                           >

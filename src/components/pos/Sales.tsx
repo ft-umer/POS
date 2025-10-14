@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePOS, OrderType } from "@/contexts/POSContext";
 import {
   Card,
@@ -48,6 +48,12 @@ import autoTable from "jspdf-autotable"; // ✅ import autoTable separately
 
 
 const Sales = () => {
+    useEffect(() => {
+    // Force reload on first mount (not on re-render)
+    if (performance.navigation.type !== performance.navigation.TYPE_RELOAD) {
+      window.location.reload();
+    }
+  }, []);
   const { sales, deleteSale, updateSale, orderTakers, products } = usePOS();
   const { toast } = useToast();
 
@@ -548,12 +554,13 @@ const Sales = () => {
                         <TableCell className="text-sm text-gray-700 max-w-xs truncate">
                           {sale.items
                             .map((item) =>
-                              item.plateType
-                                ? `${item.name} (${item.plateType} × ${item.quantity})`
-                                : `${item.name} (${item.quantity})`
+                              item?.plateType
+                                ? `${item?.name} (${item?.plateType} × ${item?.quantity})`
+                                : `${item?.name} (${item?.quantity})`
                             )
                             .join(", ")}
                         </TableCell>
+
 
                         <TableCell>
                           <Badge className="bg-orange-100 text-orange-700 border-none">
@@ -833,7 +840,7 @@ const Sales = () => {
                             {products
                               .filter((p) => p.name !== item.name)
                               .map((product) => (
-                                <option key={product.id} value={product.name}>
+                                <option key={product._id} value={product.name}>
                                   {product.name}
                                 </option>
                               ))}

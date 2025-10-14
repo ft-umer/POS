@@ -1,8 +1,10 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import axios from "axios";
 
 interface User {
+  _id?: string;
   username: string;
   role: "superadmin" | "admin";
   site?: string;
@@ -15,112 +17,89 @@ interface AuthContextType {
   isAuthenticated: boolean;
   loading: boolean;
   user: User | null;
-  login: (username: string, password: string, pin: string) => boolean;
-  logout: () => void;
+  token: string | null;
+  login: (username: string, password: string, pin?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   users: User[];
+  fetchUsers: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const API_BASE = "https://pos-backend-kappa.vercel.app"; // backend URL
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
 
-  // ✅ Load or initialize users once
+  // ✅ On mount, restore session from localStorage
   useEffect(() => {
-    const storedUsers = localStorage.getItem("pos_users");
-    if (storedUsers) {
-      setUsers(JSON.parse(storedUsers));
-    } else {
-      const demoUsers: User[] = [
-        { username: "superadmin", role: "superadmin" },
-        { username: "admin1", role: "admin", site: "Site1", pin: "1111" },
-        { username: "admin2", role: "admin", site: "Site2", pin: "2222" },
-        { username: "admin3", role: "admin", site: "Site3", pin: "3333" },
-      ];
-      localStorage.setItem("pos_users", JSON.stringify(demoUsers));
-      setUsers(demoUsers);
-    }
-
-    const currentUser = localStorage.getItem("pos_user");
-    const authFlag = localStorage.getItem("pos_auth") === "true";
-
-    if (authFlag && currentUser) {
-      setUser(JSON.parse(currentUser));
+    const storedToken = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
+    if (storedToken && storedUser) {
+      setToken(storedToken);
+      setUser(JSON.parse(storedUser));
       setIsAuthenticated(true);
     }
-
     setLoading(false);
   }, []);
 
   // ✅ Login
-  const login = (username: string, password: string, pin: string) => {
-    const now = new Date().toISOString();
-    const foundUser = users.find((u) => u.username === username);
+  const login = async (username: string, password: string, pin?: string) => {
+    try {
+      const res = await axios.post(`${API_BASE}/login`, { username, password, pin });
+      setUser(res.data.user);
+      setToken(res.data.token);
+      setIsAuthenticated(true);
 
-    if (!foundUser) {
-      console.warn(`❌ Login failed: User "${username}" not found`);
+      // Save session
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+
+      return true;
+    } catch (err) {
+      console.error("Login failed", err);
       return false;
     }
-
-    if (foundUser.role === "superadmin" && password === "123456") {
-      const updatedSuperadmin = { ...foundUser, lastLogin: now, lastLogout: "" };
-      updateUsers(username, updatedSuperadmin);
-      setUser(updatedSuperadmin);
-      setIsAuthenticated(true);
-      console.log(`🟢 SUPERADMIN "${username}" logged in at ${now}`);
-      return true;
-    }
-
-    if (foundUser.role === "admin" && password === "123456" && pin === foundUser.pin) {
-      const updatedAdmin = { ...foundUser, lastLogin: now, lastLogout: "" };
-      updateUsers(username, updatedAdmin);
-      setUser(updatedAdmin);
-      setIsAuthenticated(true);
-      console.log(`🟢 ADMIN "${username}" logged in at ${now}`);
-      return true;
-    }
-
-    console.warn(`❌ Login failed for "${username}"`);
-    return false;
   };
 
   // ✅ Logout
-  const logout = () => {
-    if (!user) return;
-    const now = new Date().toISOString();
-
-    const updatedUser = { ...user, lastLogout: now };
-    updateUsers(user.username, updatedUser);
-
-    console.log(`🔴 ${user.role.toUpperCase()} "${user.username}" logged out at ${now}`);
-
-    setUser(null);
-    setIsAuthenticated(false);
-    localStorage.setItem("pos_auth", "false");
-    localStorage.removeItem("pos_user");
-
-    // 🔄 trigger update for AdminList
-    window.dispatchEvent(new Event("storage"));
+  const logout = async () => {
+    if (!token) return;
+    try {
+      await axios.post(`${API_BASE}/logout`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.warn("Logout error", err);
+    } finally {
+      setUser(null);
+      setToken(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    }
   };
 
-  // ✅ Helper: Update users array + storage in one place
-  const updateUsers = (username: string, updatedUser: User) => {
-    const updatedList = users.map((u) => (u.username === username ? updatedUser : u));
-    setUsers(updatedList);
-    localStorage.setItem("pos_users", JSON.stringify(updatedList));
-    localStorage.setItem("pos_user", JSON.stringify(updatedUser));
-    localStorage.setItem("pos_auth", "true");
-
-    // 🔄 notify listeners (AdminList)
-    window.dispatchEvent(new Event("storage"));
+  // ✅ Fetch all users (superadmin only)
+  const fetchUsers = async () => {
+    if (!token) return;
+    try {
+      const res = await axios.get(`${API_BASE}/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUsers(res.data);
+    } catch (err) {
+      console.error("Fetch users failed", err);
+    }
   };
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, user, login, logout, users, loading }}
+      value={{ isAuthenticated, user, token, login, logout, loading, users, fetchUsers }}
     >
       {children}
     </AuthContext.Provider>

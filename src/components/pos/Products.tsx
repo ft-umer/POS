@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import { usePOS } from "@/contexts/POSContext";
 import { Button } from "@/components/ui/button";
@@ -24,13 +26,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
 const Products = () => {
   const { products, addProduct, updateProduct, deleteProduct } = usePOS();
-  const [searchTerm, setSearchTerm] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -40,6 +40,7 @@ const Products = () => {
     category: "",
     barcode: "",
     imageUrl: "",
+    imageFile: null as File | null, // 👈 file for backend upload
     plateType: "Full Plate",
   });
   const { toast } = useToast();
@@ -52,37 +53,59 @@ const Products = () => {
       category: "",
       barcode: "",
       imageUrl: "",
+      imageFile: null,
       plateType: "Full Plate",
     });
     setEditingProduct(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // === HANDLE SUBMIT ===
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const productData = {
-      name: formData.name,
-      price: parseFloat(formData.price),
-      stock: parseInt(formData.stock),
-      category: formData.category,
-      barcode: formData.barcode,
-      imageUrl: formData.imageUrl,
-      plateType: formData.plateType,
-    };
 
-    if (editingProduct) {
-      updateProduct(editingProduct, productData);
-      toast({ title: "Product updated successfully" });
-    } else {
-      addProduct(productData);
-      toast({ title: "Product added successfully" });
+    try {
+      const form = new FormData();
+      form.append("name", formData.name);
+      form.append("price", formData.price);
+      form.append("stock", formData.stock);
+      form.append("category", formData.category);
+      form.append("plateType", formData.plateType);
+      if (formData.barcode) form.append("barcode", formData.barcode);
+      if (formData.imageFile) form.append("image", formData.imageFile); // 👈 key must match multer
+
+      let res;
+      if (editingProduct) {
+        res = await fetch(`https://pos-backend-kappa.vercel.app/products/${editingProduct}`, {
+          method: "PUT",
+          body: form,
+        });
+      } else {
+        res = await fetch(`https://pos-backend-kappa.vercel.app/products`, {
+          method: "POST",
+          body: form,
+        });
+      }
+
+      if (!res.ok) throw new Error("Failed to save product");
+
+      toast({
+        title: editingProduct ? "Product updated successfully" : "Product added successfully",
+      });
+
+      resetForm();
+      setIsOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Image upload failed",
+        variant: "destructive",
+      });
     }
-
-    resetForm();
-    setIsOpen(false);
   };
 
+  // === HANDLE EDIT ===
   const handleEdit = (product: any) => {
-    setEditingProduct(product.id);
+    setEditingProduct(product._id);
     setFormData({
       name: product.name,
       price: product.price.toString(),
@@ -90,22 +113,48 @@ const Products = () => {
       category: product.category,
       barcode: product.barcode || "",
       imageUrl: product.imageUrl || "",
+      imageFile: null,
       plateType: product.plateType || "Full Plate",
     });
     setIsOpen(true);
   };
 
-  const handleDelete = (id: string) => {
+  // === HANDLE DELETE ===
+  const handleDelete = async (id: string) => {
     deleteProduct(id);
     toast({ title: "Product deleted successfully" });
   };
 
+  // === HANDLE IMAGE CHANGE ===
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const previewUrl = URL.createObjectURL(file);
+
+      // Clean up any previous blob URL
+      if (formData.imageUrl) URL.revokeObjectURL(formData.imageUrl);
+
+      setFormData({
+        ...formData,
+        imageUrl: previewUrl,
+        imageFile: file,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        imageUrl: "",
+        imageFile: null,
+      });
+    }
+  };
+
   return (
     <Card className="bg-white shadow-sm border border-gray-200 rounded-2xl">
-      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 border-b border-gray-100">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-100">
         <CardTitle className="text-2xl font-semibold text-black">
           Product Management
         </CardTitle>
+
         <Dialog
           open={isOpen}
           onOpenChange={(open) => {
@@ -119,19 +168,20 @@ const Products = () => {
               Add Product
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto rounded-2xl">
+
+          <DialogContent className="max-w-[95vw] sm:max-w-[500px] rounded-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-lg font-semibold text-black">
                 {editingProduct ? "Edit Product" : "Add New Product"}
               </DialogTitle>
             </DialogHeader>
+
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Product name */}
+              {/* === NAME === */}
               <div className="space-y-2">
                 <Label htmlFor="name">Product Name</Label>
                 <Input
                   id="name"
-                  className="focus:ring-2 focus:ring-primary border-gray-300"
                   value={formData.name}
                   onChange={(e) =>
                     setFormData({ ...formData, name: e.target.value })
@@ -140,15 +190,13 @@ const Products = () => {
                 />
               </div>
 
-              {/* Price & Stock */}
+              {/* === PRICE & STOCK === */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="price">Price (PKR)</Label>
                   <Input
                     id="price"
                     type="number"
-                    className="focus:ring-2 focus:ring-primary border-gray-300"
-                    step="0.01"
                     value={formData.price}
                     onChange={(e) =>
                       setFormData({ ...formData, price: e.target.value })
@@ -156,12 +204,12 @@ const Products = () => {
                     required
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="stock">Stock Quantity</Label>
                   <Input
                     id="stock"
                     type="number"
-                    className="focus:ring-2 focus:ring-primary border-gray-300"
                     value={formData.stock}
                     onChange={(e) =>
                       setFormData({ ...formData, stock: e.target.value })
@@ -171,12 +219,11 @@ const Products = () => {
                 </div>
               </div>
 
-              {/* Category */}
+              {/* === CATEGORY === */}
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Input
                   id="category"
-                  className="focus:ring-2 focus:ring-primary border-gray-300"
                   value={formData.category}
                   onChange={(e) =>
                     setFormData({ ...formData, category: e.target.value })
@@ -185,7 +232,7 @@ const Products = () => {
                 />
               </div>
 
-              {/* Plate Type */}
+              {/* === PLATE TYPE === */}
               <div className="space-y-2">
                 <Label htmlFor="plateType">Plate Type</Label>
                 <select
@@ -214,20 +261,14 @@ const Products = () => {
                 </select>
               </div>
 
-              {/* Image Upload */}
+              {/* === IMAGE UPLOAD === */}
               <div className="space-y-2">
-                <Label htmlFor="imageUrl">Image</Label>
+                <Label htmlFor="image">Image</Label>
                 <Input
                   type="file"
-                  id="imageUrl"
+                  id="image"
                   accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const imageUrl = URL.createObjectURL(file);
-                      setFormData({ ...formData, imageUrl });
-                    }
-                  }}
+                  onChange={handleImageChange}
                 />
                 {formData.imageUrl && (
                   <div className="relative inline-block mt-2">
@@ -239,7 +280,11 @@ const Products = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        setFormData({ ...formData, imageUrl: "" })
+                        setFormData({
+                          ...formData,
+                          imageUrl: "",
+                          imageFile: null,
+                        })
                       }
                       className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                     >
@@ -260,14 +305,13 @@ const Products = () => {
         </Dialog>
       </CardHeader>
 
-      {/* Product Table */}
+      {/* === TABLE === */}
       <CardContent className="p-4 sm:p-6">
         <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader className="bg-orange-100">
               <TableRow>
                 <TableHead className="font-semibold text-black">Name</TableHead>
-               
                 <TableHead>Price</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Plate Type</TableHead>
@@ -276,7 +320,7 @@ const Products = () => {
             </TableHeader>
             <TableBody>
               {products.map((product) => (
-                <TableRow key={product.id} className="hover:bg-muted/5 transition">
+                <TableRow key={product._id} className="hover:bg-muted/5">
                   <TableCell className="font-medium flex items-center gap-3">
                     {product.imageUrl && (
                       <img
@@ -287,7 +331,6 @@ const Products = () => {
                     )}
                     {product.name}
                   </TableCell>
-                 
                   <TableCell className="text-primary font-semibold">
                     {product.price} PKR
                   </TableCell>
@@ -299,15 +342,13 @@ const Products = () => {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEdit(product)}
-                        className="text-black hover:text-primary"
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(product.id)}
-                        className="text-black hover:text-red-500"
+                        onClick={() => handleDelete(product._id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
