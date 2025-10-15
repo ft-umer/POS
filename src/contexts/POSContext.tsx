@@ -97,42 +97,42 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   const [sales, setSales] = useState<Sale[]>(() => {
     const saved = localStorage.getItem("pos_sales");
     return saved ? JSON.parse(saved) : [];
-    
-    
+
+
   });
-  
-  
-  
+
+
+
   const [orderTakers, setOrderTakers] = useState<OrderTaker[]>([]);
-  
-   useEffect(() => {
-  const fetchOrderTakers = async () => {
-    try {
-      const res = await axios.get(`${ORDERTAKERS_URL}`);
 
-      // Normalize
-      const formatted = res.data.map((taker: any) => ({
-        id: taker._id,
-        name: taker.name,
-        phone: taker.phone || "",
-        balance: taker.balance || 0,
-        imageUrl: taker.imageUrl || "",
-      }));
+  useEffect(() => {
+    const fetchOrderTakers = async () => {
+      try {
+        const res = await axios.get(`${ORDERTAKERS_URL}`);
 
-      // ✅ DO NOT filter Tahir Sb here — keep all in DB and localStorage
-      setOrderTakers(formatted);
-      localStorage.setItem("pos_orderTakers", JSON.stringify(formatted));
-    } catch (err) {
-      console.error("Error fetching order takers:", err);
+        // Normalize
+        const formatted = res.data.map((taker: any) => ({
+          id: taker._id,
+          name: taker.name,
+          phone: taker.phone || "",
+          balance: taker.balance || 0,
+          imageUrl: taker.imageUrl || "",
+        }));
 
-      // ✅ fallback to localStorage if offline
-      const saved = localStorage.getItem("pos_orderTakers");
-      if (saved) setOrderTakers(JSON.parse(saved));
-    }
-  };
+        // ✅ DO NOT filter Tahir Sb here — keep all in DB and localStorage
+        setOrderTakers(formatted);
+        localStorage.setItem("pos_orderTakers", JSON.stringify(formatted));
+      } catch (err) {
+        console.error("Error fetching order takers:", err);
 
-  fetchOrderTakers();
-}, []);
+        // ✅ fallback to localStorage if offline
+        const saved = localStorage.getItem("pos_orderTakers");
+        if (saved) setOrderTakers(JSON.parse(saved));
+      }
+    };
+
+    fetchOrderTakers();
+  }, []);
 
 
 
@@ -354,7 +354,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
       alert("✅ Sale saved offline (will sync later).");
     }
 
-    // ✅ Update balance only if not in zero mode
+    // ✅ Update balance both locally & in DB
     setOrderTakers((prev) =>
       prev.map((t) =>
         t.id === orderTakerId
@@ -362,6 +362,23 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
           : t
       )
     );
+
+    // ✅ Persist updated balance in backend (if not Tahir mode)
+    if (!tahirPinActive) {
+      try {
+        const taker = orderTakers.find((t) => t.id === orderTakerId);
+        if (taker) {
+          await safeRequest(() =>
+            axios.put(`${ORDERTAKERS_URL}/${orderTakerId}`, {
+              balance: taker.balance - total,
+            })
+          );
+        }
+      } catch (err) {
+        console.warn("⚠️ Could not update order taker balance in DB:", err);
+      }
+    }
+
 
     // ✅ Update product stock normally
     setProducts((prev) =>
