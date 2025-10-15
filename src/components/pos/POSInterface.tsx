@@ -349,12 +349,13 @@ const POSInterface = () => {
                   toast({
                     title: "Tahir Sb Mode Activated",
                     description: "Order taker set to Tahir Sb and total bill set to 0 PKR.",
+                    className: "bg-green-500 text-white",
                   });
                 } else if (pin && pin.trim() !== "") {
                   toast({
                     title: "Incorrect PIN",
                     description: "Please enter the correct PIN.",
-                    variant: "destructive",
+                    className: "bg-red-500 text-white",
                   });
                   setTahirPinActive(false);
                 }
