@@ -177,10 +177,18 @@ const OrderTakers = () => {
                   return nameA.localeCompare(nameB);
                 })
                   .map((taker) => (
-                    <TableRow key={taker.id} className="hover:bg-orange-50 transition">
+                    <TableRow
+                      key={taker.id}
+                      className={`hover:bg-orange-50 transition ${taker.name.toLowerCase().includes("tahir sb")
+                          ? "bg-green-100 hover:bg-green-200"
+                          : ""
+                        }`}
+                    >
                       <TableCell className="font-medium text-text">{taker.name}</TableCell>
                       <TableCell className="text-green-700 font-semibold">
-                        Rs. {(taker.balance ?? 0).toLocaleString()}
+                        {taker.name.toLowerCase().includes("tahir sb")
+                          ? "Unlimited"
+                          : `Rs. ${(taker.balance ?? 0).toLocaleString()}`}
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-2">
@@ -203,6 +211,7 @@ const OrderTakers = () => {
                         </div>
                       </TableCell>
                     </TableRow>
+
                   ))
               ) : (
                 <TableRow>
