@@ -354,7 +354,7 @@ const POSInterface = () => {
                 } else if (pin && pin.trim() !== "") {
                   toast({
                     title: "Incorrect PIN",
-                    description: "Please enter the correct PIN.",
+                    description: "Please enter the correct PIN to put Tahir sb's sale.",
                     className: "bg-red-500 text-white",
                   });
                   setTahirPinActive(false);
