@@ -105,10 +105,10 @@ const Dashboard = () => {
               return (
                 <Link key={item.path} to={item.path} onClick={() => setIsMobileMenuOpen(false)}>
                   <div
-                    className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 shadow-sm
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:shadow-md hover:scale-[1.02]
                       ${isActive
                         ? "bg-orange-500/90 text-white shadow-md scale-[1.02]"
-                        : "bg-white/40 hover:bg-white/60 text-gray-800"
+                        : "bg-white/40 hover:bg-white/60 text-gray-800 "
                       }`}
                   >
                     <span className="font-medium">{item.name}</span>
