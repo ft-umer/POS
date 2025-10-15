@@ -84,7 +84,7 @@ const POSContext = createContext<POSContextType | undefined>(undefined);
 // ======================
 export const POSProvider = ({ children }: { children: ReactNode }) => {
   // 🧠 Dynamically detect backend URL
-  const BASE_URL = "https://pos-backend-kappa.vercel.app"; // Change as needed
+  const BASE_URL = "http://localhost:5000"; // Change as needed
 
   const PRODUCTS_URL = `${BASE_URL}/products`;
   const SALES_URL = `${BASE_URL}/sales`;

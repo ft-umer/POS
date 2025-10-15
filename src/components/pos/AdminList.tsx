@@ -47,7 +47,7 @@ const AdminList = () => {
     setSuccess("");
 
     try {
-      const res = await fetch("https://pos-backend-kappa.vercel.app/users", {
+      const res = await fetch("http://localhost:5000/users", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(formData),
