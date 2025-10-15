@@ -333,7 +333,7 @@ const POSInterface = () => {
               onClick={() => {
                 const pin = prompt("Enter PIN to activate Tahir Sb mode:");
 
-                if (pin === "1234") {
+                if (pin === "0000786") {
                   // ✅ Find Tahir Sb from order takers
                   const tahir = orderTakers.find((t) =>
                     t.name.toLowerCase().includes("tahir sb")
