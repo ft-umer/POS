@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import axios from "axios";
+import { toast } from "@/components/ui/sonner";
 
 // ======================
 // Interfaces
@@ -8,18 +9,20 @@ import axios from "axios";
 export interface Product {
   _id?: string;
   name: string;
-  price: number;
+  fullPrice: number;
+  halfPrice: number;
   stock: number;
   barcode?: string;
-  plateType?: string;
   imageUrl?: string;
-  createdAt?: string;
 }
+
 
 export type OrderType = "Dine In" | "Take Away" | "Drive Thru" | "Delivery";
 
 export interface CartItem extends Product {
   quantity: number;
+  selectedPrice: number; // either fullPrice or halfPrice
+  plateType: "Full Plate" | "Half Plate";
 }
 
 export interface Sale {
@@ -35,7 +38,7 @@ export interface Sale {
 export interface OrderTaker {
   id: string;
   name: string;
-  phone: string;
+  phone?: string;
   balance: number;
   imageUrl?: string;
 }
@@ -60,6 +63,11 @@ interface POSContextType {
   updateCartQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
 
+  tahirPinActive: boolean;
+  setTahirPinActive: React.Dispatch<React.SetStateAction<boolean>>;
+  customTotal: number | null;
+  setCustomTotal: React.Dispatch<React.SetStateAction<number | null>>;
+
   completeSale: (paymentMethod: string, orderType: OrderType, orderTakerId: string) => void;
   updateSale: (saleId: string, updatedData: Partial<Sale>) => void;
   deleteSale: (saleId: string) => void;
@@ -76,11 +84,11 @@ const POSContext = createContext<POSContextType | undefined>(undefined);
 // ======================
 export const POSProvider = ({ children }: { children: ReactNode }) => {
   // 🧠 Dynamically detect backend URL
-  const BASE_URL = "https://pos-backend-kappa.vercel.app";
+  const BASE_URL = "https://pos-backend-kappa.vercel.app"; // Change as needed
 
   const PRODUCTS_URL = `${BASE_URL}/products`;
   const SALES_URL = `${BASE_URL}/sales`;
-
+  const ORDERTAKERS_URL = `${BASE_URL}/orderTakers`;
   // --------------------
   // States
   // --------------------
@@ -89,17 +97,47 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   const [sales, setSales] = useState<Sale[]>(() => {
     const saved = localStorage.getItem("pos_sales");
     return saved ? JSON.parse(saved) : [];
+    
+    
   });
-  const [orderTakers, setOrderTakers] = useState<OrderTaker[]>(() => {
-    const saved = localStorage.getItem("pos_orderTakers");
-    return saved
-      ? JSON.parse(saved)
-      : [
-          { id: "1", name: "Ahmad", phone: "03001234567", balance: 5000 },
-          { id: "2", name: "Sara", phone: "03002345678", balance: 3000 },
-          { id: "3", name: "Hassan", phone: "03003456789", balance: 7000 },
-        ];
-  });
+  
+  
+  
+  const [orderTakers, setOrderTakers] = useState<OrderTaker[]>([]);
+  
+   useEffect(() => {
+  const fetchOrderTakers = async () => {
+    try {
+      const res = await axios.get(`${ORDERTAKERS_URL}`);
+
+      // Map DB results -> frontend format (normalize IDs)
+      const formatted = res.data.map((taker: any) => ({
+        id: taker._id,
+        name: taker.name,
+        phone: taker.phone || "",
+        balance: taker.balance || 0,
+        imageUrl: taker.imageUrl || "",
+      }));
+
+      // Filter out Tahir Sb
+      const filtered = formatted.filter(
+        (taker) => taker.name.toLowerCase() !== "tahir sb"
+      );
+
+      setOrderTakers(filtered);
+      localStorage.setItem("pos_orderTakers", JSON.stringify(filtered));
+    } catch (err) {
+      console.error("Error fetching order takers:", err);
+
+      // ✅ fallback to localStorage if offline
+      const saved = localStorage.getItem("pos_orderTakers");
+      if (saved) setOrderTakers(JSON.parse(saved));
+    }
+  };
+
+  fetchOrderTakers();
+}, []);
+
 
   // 🔒 Safe axios wrapper
   const safeRequest = async <T,>(fn: () => Promise<T>): Promise<T | null> => {
@@ -128,46 +166,55 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     reloadProducts();
   }, []);
-  
-  
+
+
   // ============================
-// Sales Fetch (Online + Offline)
-// ============================
-const reloadSales = async () => {
-  const res = await safeRequest(() => axios.get(SALES_URL));
+  // Sales Fetch (Online + Offline)
+  // ============================
+  const reloadSales = async () => {
+    const res = await safeRequest(() => axios.get(SALES_URL));
 
-  if (res && res.data) {
-    // 🧠 Map sales so that each item includes product name, price, etc.
-    const mappedSales = res.data.map((sale: any) => ({
-      id: sale._id,
-      total: sale.total,
-      paymentMethod: sale.paymentMethod,
-      orderType: sale.orderType,
-      orderTaker: sale.orderTaker,
-      date: sale.createdAt,
-      items: sale.items.map((item: any) => ({
-        productId: item.productId?._id || item.productId,
-        name: item.productId?.name || "Unknown Product",
-        price: item.productId?.price || item.price,
-        imageUrl: item.productId?.imageUrl,
-        plateType: item.productId?.plateType,
-        quantity: item.quantity,
-      })),
-    }));
+    if (res && res.data) {
+      const mappedSales = res.data.map((sale: any) => ({
+        id: sale._id,
+        total: sale.total,
+        paymentMethod: sale.paymentMethod,
+        orderType: sale.orderType,
+        orderTaker: sale.orderTaker,
+        date: sale.createdAt,
+        items: sale.items.map((item: any) => {
+          const product = item.productId;
 
-    setSales(mappedSales);
-    localStorage.setItem("pos_sales", JSON.stringify(mappedSales));
-  } else {
-    // Offline mode fallback
-    const saved = localStorage.getItem("pos_sales");
-    if (saved) setSales(JSON.parse(saved));
-  }
-};
+          // Infer plate type automatically from price
+          let plateType = "Full Plate";
+          if (item.price === product?.halfPrice) plateType = "Half Plate";
 
-// 🔄 Load sales when app starts
-useEffect(() => {
-  reloadSales();
-}, []);
+          return {
+            productId: product?._id || item.productId,
+            name: product?.name || "Unknown Product",
+            selectedPrice: item.price,
+            plateType,
+            quantity: item.quantity,
+            imageUrl: product?.imageUrl,
+            fullPrice: product?.fullPrice,
+            halfPrice: product?.halfPrice,
+          };
+        }),
+      }));
+
+      setSales(mappedSales);
+      localStorage.setItem("pos_sales", JSON.stringify(mappedSales));
+    } else {
+      const saved = localStorage.getItem("pos_sales");
+      if (saved) setSales(JSON.parse(saved));
+    }
+  };
+
+
+  // 🔄 Load sales when app starts
+  useEffect(() => {
+    reloadSales();
+  }, []);
 
 
   // ============================
@@ -185,6 +232,7 @@ useEffect(() => {
       localStorage.setItem("pos_products", JSON.stringify(updated));
     }
   };
+
 
   const updateProduct = async (id: string, product: Partial<Product>) => {
     const res = await safeRequest(() => axios.put(`${PRODUCTS_URL}/${id}`, product));
@@ -206,34 +254,43 @@ useEffect(() => {
 
   // ============================
   // Cart Management
-  // ============================
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, plateType: "Full Plate" | "Half Plate") => {
+    const selectedPrice = plateType === "Full Plate" ? product.fullPrice : product.halfPrice;
+
     setCart((prev) => {
-      const existing = prev.find((item) => item._id === product._id);
+      const existing = prev.find(item => item._id === product._id && item.plateType === plateType);
       if (existing) {
-        return prev.map((item) =>
-          item._id === product._id
+        return prev.map(item =>
+          item._id === product._id && item.plateType === plateType
             ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity: 1, selectedPrice, plateType }];
     });
   };
 
-  const removeFromCart = (productId: string) =>
-    setCart((prev) => prev.filter((item) => item._id !== productId));
 
-  const updateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) return removeFromCart(productId);
-    setCart((prev) =>
-      prev.map((item) =>
-        item._id === productId ? { ...item, quantity } : item
+  const removeFromCart = (_id: string, plateType: "Full Plate" | "Half Plate") => {
+    setCart(prev => prev.filter(item => !(item._id === _id && item.plateType === plateType)));
+  };
+
+
+  const updateCartQuantity = (_id: string, plateType: "Full Plate" | "Half Plate", quantity: number) => {
+    setCart(prev =>
+      prev.map(item =>
+        item._id === _id && item.plateType === plateType ? { ...item, quantity } : item
       )
     );
   };
 
+
+
   const clearCart = () => setCart([]);
+  // ✅ Add these at the top-level (GLOBAL state)
+  const [tahirPinActive, setTahirPinActive] = useState(false);
+  const [customTotal, setCustomTotal] = useState<number | null>(null);
+
 
   // ============================
   // Complete Sale (Online + Offline)
@@ -243,18 +300,28 @@ useEffect(() => {
     orderType: OrderType,
     orderTakerId: string
   ) => {
-    const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const taker = orderTakers.find((t) => t.id === orderTakerId);
+    // Normal total calculation
+    let total = cart.reduce((sum, item) => sum + item.selectedPrice * item.quantity, 0);
 
+    const taker = orderTakers.find((t) => t.id === orderTakerId);
     if (!taker) return alert("Invalid order taker selected.");
-    if (taker.balance < total)
+
+    // ✅ Enforce 0 total if Tahir Sb mode active
+    if (tahirPinActive && customTotal !== null) {
+      total = 0;
+    }
+
+    // ✅ Skip balance check if Tahir Sb zero mode active
+    if (!tahirPinActive && taker.balance < total) {
       return alert(`${taker.name} has insufficient balance.`);
+    }
 
     const salePayload = {
       items: cart.map((item) => ({
         productId: item._id,
         quantity: item.quantity,
-        price: item.price,
+        price: item.selectedPrice,
+        plateType: item.plateType,
       })),
       total,
       paymentMethod,
@@ -273,7 +340,7 @@ useEffect(() => {
       const updatedSales = [newSale, ...sales];
       setSales(updatedSales);
       localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
-      alert("✅ Sale completed successfully (Online).");
+      toast("✅ Sale completed successfully (Online).");
     } else {
       const offlineSale: Sale = {
         id: Date.now().toString(),
@@ -290,18 +357,28 @@ useEffect(() => {
       alert("✅ Sale saved offline (will sync later).");
     }
 
+    // ✅ Update balance only if not in zero mode
     setOrderTakers((prev) =>
       prev.map((t) =>
-        t.id === orderTakerId ? { ...t, balance: t.balance - total } : t
+        t.id === orderTakerId
+          ? { ...t, balance: t.balance - (tahirPinActive ? 0 : total) }
+          : t
       )
     );
+
+    // ✅ Update product stock normally
     setProducts((prev) =>
       prev.map((p) => {
         const cartItem = cart.find((c) => c._id === p._id);
         return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
       })
     );
+
     clearCart();
+
+    // ✅ Optional: reset Tahir mode after sale
+    setTahirPinActive(false);
+    setCustomTotal(null);
   };
 
   // ============================
@@ -333,30 +410,45 @@ useEffect(() => {
     }
   };
 
-  // ============================
-  // Order Taker CRUD
-  // ============================
-  const addOrderTaker = (taker: Omit<OrderTaker, "id">) => {
+  // Add Order Taker
+  const addOrderTaker = async (taker: Omit<OrderTaker, "id">) => {
     const newTaker: OrderTaker = { ...taker, id: Date.now().toString() };
-    const updated = [...orderTakers, newTaker];
-    setOrderTakers(updated);
-    localStorage.setItem("pos_orderTakers", JSON.stringify(updated));
+
+    // Try online
+    const res = await safeRequest(() => axios.post(ORDERTAKERS_URL, taker));
+    if (res && res.data) {
+      newTaker.id = res.data._id;
+      setOrderTakers(prev => [...prev, newTaker]);
+      localStorage.setItem("pos_orderTakers", JSON.stringify([...orderTakers, newTaker]));
+      return;
+    }
+
+    // Offline fallback
+    setOrderTakers(prev => [...prev, newTaker]);
+    localStorage.setItem("pos_orderTakers", JSON.stringify([...orderTakers, newTaker]));
   };
 
-  const updateOrderTaker = (id: string, updated: Partial<OrderTaker>) => {
-    const updatedTakers = orderTakers.map((t) =>
-      t.id === id ? { ...t, ...updated } : t
-    );
+
+  // Update Order Taker
+  const updateOrderTaker = async (id: string, updated: Partial<OrderTaker>) => {
+    // Try online
+    const res = await safeRequest(() => axios.put(`${ORDERTAKERS_URL}/${id}`, updated));
+    const updatedTakers = orderTakers.map(t => t.id === id ? { ...t, ...(res?.data || updated) } : t);
+
     setOrderTakers(updatedTakers);
     localStorage.setItem("pos_orderTakers", JSON.stringify(updatedTakers));
   };
 
-  const deleteOrderTaker = (id: string) => {
-    const updated = orderTakers.filter((t) => t.id !== id);
+
+  // Delete Order Taker
+  const deleteOrderTaker = async (id: string) => {
+    // Try online
+    await safeRequest(() => axios.delete(`${ORDERTAKERS_URL}/${id}`));
+
+    const updated = orderTakers.filter(t => t.id !== id);
     setOrderTakers(updated);
     localStorage.setItem("pos_orderTakers", JSON.stringify(updated));
   };
-
   // ============================
   // Return
   // ============================
@@ -382,6 +474,10 @@ useEffect(() => {
         updateOrderTaker,
         deleteOrderTaker,
         reloadSales,
+        tahirPinActive,       // ✅ expose these
+        setTahirPinActive,    // ✅
+        customTotal,          // ✅
+        setCustomTotal,       // ✅
       }}
     >
       {children}

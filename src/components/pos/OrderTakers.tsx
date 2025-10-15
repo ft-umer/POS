@@ -31,12 +31,11 @@ const OrderTakers = () => {
 
   const [formData, setFormData] = useState({
     name: "",
-    phone: "",
     balance: 0,
   });
 
   const resetForm = () => {
-    setFormData({ name: "", phone: "", balance: 0 });
+    setFormData({ name: "", balance: 0 });
     setEditingTaker(null);
   };
 
@@ -64,7 +63,6 @@ const OrderTakers = () => {
     setEditingTaker(taker.id);
     setFormData({
       name: taker.name,
-      phone: taker.phone,
       balance: taker.balance ?? 0,
     });
     setIsOpen(true);
@@ -122,22 +120,7 @@ const OrderTakers = () => {
                 />
               </div>
 
-              {/* Phone */}
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium text-text">
-                  Phone Number
-                </Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  required
-                  className="border-border focus:ring-2 focus:ring-primary"
-                />
-              </div>
+
 
               {/* Balance */}
               <div className="space-y-2">
@@ -174,7 +157,6 @@ const OrderTakers = () => {
             <TableHeader className="bg-orange-100">
               <TableRow>
                 <TableHead className="text-text font-semibold">Name</TableHead>
-                <TableHead className="text-text font-semibold">Phone</TableHead>
                 <TableHead className="text-text font-semibold">Balance</TableHead>
                 <TableHead className="text-text font-semibold text-center">
                   Actions
@@ -183,35 +165,45 @@ const OrderTakers = () => {
             </TableHeader>
             <TableBody>
               {orderTakers.length > 0 ? (
-                orderTakers.map((taker) => (
-                  <TableRow key={taker.id} className="hover:bg-orange-50 transition">
-                    <TableCell className="font-medium text-text">{taker.name}</TableCell>
-                    <TableCell className="text-muted">{taker.phone}</TableCell>
-                    <TableCell className="text-green-700 font-semibold">
-                      Rs. {(taker.balance ?? 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(taker)}
-                          className="text-primary hover:bg-orange-100"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(taker.id)}
-                          className="text-black hover:bg-red-100"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                [...orderTakers].sort((a, b) => {
+                  const nameA = a.name.toLowerCase();
+                  const nameB = b.name.toLowerCase();
+
+                  // Tahir sb always comes first
+                  if (nameA.includes("tahir sb")) return -1;
+                  if (nameB.includes("tahir sb")) return 1;
+
+                  // Otherwise, sort alphabetically (optional)
+                  return nameA.localeCompare(nameB);
+                })
+                  .map((taker) => (
+                    <TableRow key={taker.id} className="hover:bg-orange-50 transition">
+                      <TableCell className="font-medium text-text">{taker.name}</TableCell>
+                      <TableCell className="text-green-700 font-semibold">
+                        Rs. {(taker.balance ?? 0).toLocaleString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(taker)}
+                            className="text-primary hover:bg-orange-100"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDelete(taker.id)}
+                            className="text-black hover:bg-red-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-6 text-muted">

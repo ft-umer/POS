@@ -30,97 +30,98 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
 const Products = () => {
-  const { products, addProduct, updateProduct, deleteProduct } = usePOS();
+  const { products,updateProduct, addProduct, deleteProduct } = usePOS();
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    price: "",
+    fullPrice: "",
+    halfPrice: "",
     stock: "",
-    category: "",
+    category: "Tahir Fruit Chaat",
     barcode: "",
     imageUrl: "",
-    imageFile: null as File | null, // 👈 file for backend upload
-    plateType: "Full Plate",
+    imageFile: null as File | null,
   });
+
   const { toast } = useToast();
 
   const resetForm = () => {
     setFormData({
       name: "",
-      price: "",
+      fullPrice: "",
+      halfPrice: "",
       stock: "",
-      category: "",
+      category: "Tahir Fruit Chaat",
       barcode: "",
       imageUrl: "",
       imageFile: null,
-      plateType: "Full Plate",
     });
     setEditingProduct(null);
   };
 
-  // === HANDLE SUBMIT ===
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-    try {
+  try {
+    if (editingProduct) {
+      // For updates, call context updateProduct
+      await updateProduct(editingProduct, {
+        name: formData.name,
+        fullPrice: Number(formData.fullPrice),
+        halfPrice: Number(formData.halfPrice),
+        stock: Number(formData.stock),
+        category: formData.category,
+        barcode: formData.barcode,
+        imageUrl: formData.imageUrl,
+      });
+      toast({ title: "Product updated successfully" });
+    } else {
+      // For new products, use addProduct
       const form = new FormData();
       form.append("name", formData.name);
-      form.append("price", formData.price);
+      form.append("fullPrice", formData.fullPrice);
+      form.append("halfPrice", formData.halfPrice);
       form.append("stock", formData.stock);
       form.append("category", formData.category);
-      form.append("plateType", formData.plateType);
       if (formData.barcode) form.append("barcode", formData.barcode);
-      if (formData.imageFile) form.append("image", formData.imageFile); // 👈 key must match multer
+      if (formData.imageFile) form.append("image", formData.imageFile);
 
-      let res;
-      if (editingProduct) {
-        res = await fetch(`https://pos-backend-kappa.vercel.app/products/${editingProduct}`, {
-          method: "PUT",
-          body: form,
-        });
-      } else {
-        res = await fetch(`https://pos-backend-kappa.vercel.app/products`, {
-          method: "POST",
-          body: form,
-        });
-      }
-
-      if (!res.ok) throw new Error("Failed to save product");
-
-      toast({
-        title: editingProduct ? "Product updated successfully" : "Product added successfully",
-      });
-
-      resetForm();
-      setIsOpen(false);
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Image upload failed",
-        variant: "destructive",
-      });
+      await addProduct(form);
+      toast({ title: "Product added successfully" });
     }
-  };
+
+    resetForm();
+    setIsOpen(false);
+  } catch (err: any) {
+    console.error("Submit error:", err);
+    toast({
+      title: "Error",
+      description: err.message,
+      variant: "destructive",
+    });
+  }
+};
+
 
   // === HANDLE EDIT ===
   const handleEdit = (product: any) => {
     setEditingProduct(product._id);
     setFormData({
       name: product.name,
-      price: product.price.toString(),
+      fullPrice: product.fullPrice.toString(),
+      halfPrice: product.halfPrice.toString(),
       stock: product.stock.toString(),
-      category: product.category,
+      category: product.category || "Tahir Fruit Chaat",
       barcode: product.barcode || "",
       imageUrl: product.imageUrl || "",
       imageFile: null,
-      plateType: product.plateType || "Full Plate",
     });
     setIsOpen(true);
   };
 
   // === HANDLE DELETE ===
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     deleteProduct(id);
     toast({ title: "Product deleted successfully" });
   };
@@ -130,21 +131,10 @@ const Products = () => {
     const file = e.target.files?.[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
-
-      // Clean up any previous blob URL
       if (formData.imageUrl) URL.revokeObjectURL(formData.imageUrl);
-
-      setFormData({
-        ...formData,
-        imageUrl: previewUrl,
-        imageFile: file,
-      });
+      setFormData({ ...formData, imageUrl: previewUrl, imageFile: file });
     } else {
-      setFormData({
-        ...formData,
-        imageUrl: "",
-        imageFile: null,
-      });
+      setFormData({ ...formData, imageUrl: "", imageFile: null });
     }
   };
 
@@ -190,33 +180,47 @@ const Products = () => {
                 />
               </div>
 
-              {/* === PRICE & STOCK === */}
+              {/* === FULL & HALF PLATE PRICE === */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price (PKR)</Label>
+                  <Label htmlFor="fullPrice">Full Plate Price (PKR)</Label>
                   <Input
-                    id="price"
+                    id="fullPrice"
                     type="number"
-                    value={formData.price}
+                    value={formData.fullPrice}
                     onChange={(e) =>
-                      setFormData({ ...formData, price: e.target.value })
+                      setFormData({ ...formData, fullPrice: e.target.value })
                     }
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="stock">Stock Quantity</Label>
+                  <Label htmlFor="halfPrice">Half Plate Price (PKR)</Label>
                   <Input
-                    id="stock"
+                    id="halfPrice"
                     type="number"
-                    value={formData.stock}
+                    value={formData.halfPrice}
                     onChange={(e) =>
-                      setFormData({ ...formData, stock: e.target.value })
+                      setFormData({ ...formData, halfPrice: e.target.value })
                     }
                     required
                   />
                 </div>
+              </div>
+
+              {/* === STOCK === */}
+              <div className="space-y-2">
+                <Label htmlFor="stock">Stock Quantity</Label>
+                <Input
+                  id="stock"
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e) =>
+                    setFormData({ ...formData, stock: e.target.value })
+                  }
+                  required
+                />
               </div>
 
               {/* === CATEGORY === */}
@@ -230,35 +234,6 @@ const Products = () => {
                   }
                   required
                 />
-              </div>
-
-              {/* === PLATE TYPE === */}
-              <div className="space-y-2">
-                <Label htmlFor="plateType">Plate Type</Label>
-                <select
-                  id="plateType"
-                  value={formData.plateType}
-                  onChange={(e) => {
-                    const newType = e.target.value;
-                    let adjustedPrice = formData.price;
-
-                    if (newType === "Half Plate" && formData.price) {
-                      adjustedPrice = (parseFloat(formData.price) / 2).toString();
-                    } else if (newType === "Full Plate" && formData.price) {
-                      adjustedPrice = (parseFloat(formData.price) * 2).toString();
-                    }
-
-                    setFormData({
-                      ...formData,
-                      plateType: newType,
-                      price: adjustedPrice,
-                    });
-                  }}
-                  className="w-full border border-gray-300 rounded-md p-2 text-sm focus:ring-2 focus:ring-primary"
-                >
-                  <option value="Full Plate">Full Plate</option>
-                  <option value="Half Plate">Half Plate</option>
-                </select>
               </div>
 
               {/* === IMAGE UPLOAD === */}
@@ -280,11 +255,7 @@ const Products = () => {
                     <button
                       type="button"
                       onClick={() =>
-                        setFormData({
-                          ...formData,
-                          imageUrl: "",
-                          imageFile: null,
-                        })
+                        setFormData({ ...formData, imageUrl: "", imageFile: null })
                       }
                       className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                     >
@@ -312,9 +283,9 @@ const Products = () => {
             <TableHeader className="bg-orange-100">
               <TableRow>
                 <TableHead className="font-semibold text-black">Name</TableHead>
-                <TableHead>Price</TableHead>
+                <TableHead>Full Plate Price</TableHead>
+                <TableHead>Half Plate Price</TableHead>
                 <TableHead>Stock</TableHead>
-                <TableHead>Plate Type</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -332,10 +303,12 @@ const Products = () => {
                     {product.name}
                   </TableCell>
                   <TableCell className="text-primary font-semibold">
-                    {product.price} PKR
+                    {product.fullPrice} PKR
+                  </TableCell>
+                  <TableCell className="text-primary font-semibold">
+                    {product.halfPrice} PKR
                   </TableCell>
                   <TableCell>{product.stock}</TableCell>
-                  <TableCell>{product.plateType}</TableCell>
                   <TableCell>
                     <div className="flex justify-start gap-2">
                       <Button
