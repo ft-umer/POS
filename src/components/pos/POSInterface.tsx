@@ -68,89 +68,109 @@ const POSInterface = () => {
     }
   }, [currentTaker]);
 
-  // Print and complete sale
   const handlePrintBill = () => {
-   // ✅ Allow Tahir Sb to bypass the "please choose" error
-if (!currentTaker) {
-  const tahirSelected = orderTakers.some((t) =>
-    t.name.toLowerCase().includes("tahir sb")
-  );
+    // Find Tahir Sb in the full orderTakers list (context now contains him).
+    const tahirTaker = orderTakers.find((t) =>
+      t.name.toLowerCase().includes("tahir sb")
+    );
 
-  if (!(tahirPinActive && tahirSelected)) {
-    return toast({
-      title: "Select Order Taker",
-      description: "Please choose an order taker.",
-    });
-  }
-}
+    // current selected taker (may be undefined)
+    const selectedTaker = orderTakers.find((t) => t.id === orderTaker);
 
-    if (currentTaker.balance < cartTotal)
+    // Is Tahir mode active AND is Tahir present in list?
+    const isTahirMode = tahirPinActive && !!tahirTaker;
+
+    // Choose which taker will be used for the sale
+    const finalTaker = isTahirMode ? tahirTaker : selectedTaker;
+
+    // If no taker found and NOT Tahir-mode, ask user to select one.
+    if (!finalTaker) {
+      // if Tahir-mode was requested but Tahir is missing, show clear error
+      if (tahirPinActive && !tahirTaker) {
+        return toast({
+          title: "Tahir Sb missing",
+          description: "Tahir Sb is not available in order takers list.",
+          variant: "destructive",
+        });
+      }
+
+      return toast({
+        title: "Select Order Taker",
+        description: "Please choose an order taker.",
+        variant: "destructive",
+      });
+    }
+
+    // Calculate totals
+    const normalTotal = cart.reduce((sum, item) => sum + item.selectedPrice * item.quantity, 0);
+    const effectiveTotal = isTahirMode ? 0 : normalTotal;
+
+    // Balance check only when NOT Tahir-mode
+    if (!isTahirMode && (finalTaker.balance ?? 0) < effectiveTotal) {
       return toast({
         title: "Insufficient Balance",
-        description: `${currentTaker.name} has only ${currentTaker.balance.toFixed(2)} Rs available.`,
-        variant: "error",
+        description: `${finalTaker.name} has only ${(finalTaker.balance ?? 0).toFixed(2)} Rs available.`,
+        variant: "destructive",
       });
+    }
 
-    completeSale(paymentMethod, orderType, orderTaker);
+    // call completeSale with the final taker's id
+    completeSale(paymentMethod, orderType, finalTaker.id);
 
+    // build and open print window (use effectiveTotal in printed invoice)
     const invoiceId = "INV-" + invoiceNumber.toString().padStart(6, "0");
     const date = new Date().toLocaleString();
 
-    const itemsHTML = cart
-      .map(
-        (item) => `
-      <tr>
-        <td style="text-align:left;">${item.name} ${item.plateType ? `(${item.plateType})` : ""}</td>
-        <td style="text-align:center;">${item.quantity}</td>
-        <td style="text-align:right;">${(item.selectedPrice * item.quantity).toFixed(2)}</td>
-      </tr>`
-      )
-      .join("");
+    const itemsHTML = cart.map(item => `
+    <tr>
+      <td style="text-align:left;">${item.name} ${item.plateType ? `(${item.plateType})` : ""}</td>
+      <td style="text-align:center;">${item.quantity}</td>
+      <td style="text-align:right;">${(item.selectedPrice * item.quantity).toFixed(2)}</td>
+    </tr>`).join("");
 
     const printContent = `
-    <html>
-      <head>
-        <title>${invoiceId}</title>
-        <style>
-          body { font-family: 'Courier New', monospace; width: 58mm; margin: 0 auto; padding: 10px; text-align: center; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
-          td { padding: 2px 0; }
-          .separator { border-top: 1px dashed #000; margin: 8px 0; }
-          .total { font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png" style="width:90px; margin-bottom:10px;" />
-        <h2>Tahir Fruit Chaat</h2>
-        <p>${date}</p>
-        <div class="separator"></div>
-        <h3>INVOICE</h3>
-        <p><b>${invoiceId}</b></p>
-        <div class="separator"></div>
-        <table>
-          <thead>
-            <tr><td>Item</td><td>Qty</td><td>Amount</td></tr>
-          </thead>
-          <tbody>${itemsHTML}</tbody>
-        </table>
-        <div class="separator"></div>
-        <p>Total: ${cartTotal.toFixed(2)} PKR</p>
-        <p>Order Type: ${orderType}</p>
-        <p>Order Taker: ${currentTaker.name}</p>
-        <p>Payment: ${paymentMethod}</p>
-      </body>
+    <html><head><title>${invoiceId}</title>
+      <style>
+        body { font-family: 'Courier New', monospace; width: 58mm; margin: 0 auto; padding: 10px; text-align: center; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        td { padding: 2px 0; }
+        .separator { border-top: 1px dashed #000; margin: 8px 0; }
+      </style>
+    </head>
+    <body>
+      <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png" style="width:90px; margin-bottom:10px;" />
+      <h2>Tahir Fruit Chaat</h2>
+      <p>${date}</p>
+      <div class="separator"></div>
+      <h3>INVOICE</h3>
+      <p><b>${invoiceId}</b></p>
+      <div class="separator"></div>
+      <table>
+        <thead><tr><td>Item</td><td>Qty</td><td>Amount</td></tr></thead>
+        <tbody>${itemsHTML}</tbody>
+      </table>
+      <div class="separator"></div>
+      <p>Total: ${effectiveTotal.toFixed(2)} PKR</p>
+      <p>Order Type: ${orderType}</p>
+      <p>Order Taker: ${finalTaker.name}</p>
+      <p>Payment: ${paymentMethod}</p>
+    </body>
     </html>
-    `;
+  `;
 
     const newWindow = window.open("", "_blank", "width=400,height=600");
-    newWindow.document.write(printContent);
-    newWindow.document.close();
-    newWindow.focus();
-    newWindow.print();
+    newWindow?.document.write(printContent);
+    newWindow?.document.close();
+    newWindow?.focus();
+    newWindow?.print();
 
     setInvoiceNumber(Math.floor(Math.random() * 1000000));
-    toast({ title: "Sale Completed", description: `Total: ${cartTotal.toFixed(2)} PKR` });
+    toast({
+      title: "Sale Completed",
+      description: `Total: ${effectiveTotal.toFixed(2)} PKR (${isTahirMode ? "Tahir Sb Mode" : "Normal"})`,
+    });
   };
+
 
   const handleSelectPayment = (method: string) => {
     if (cart.length === 0) return toast({ title: "Cart is empty", description: "Add items before selecting payment.", variant: "destructive" });
@@ -277,29 +297,33 @@ if (!currentTaker) {
             <Label>Order Taker</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 mb-5 mt-3">
               {orderTakers
-               .filter((taker) => !taker.name.toLowerCase().includes("tahir sb")) // ✅ Hide Tahir Sb
-               .map((taker) => (
-                <div
-                  key={taker.id}
-                  onClick={() => {
-                    if (taker.balance > 0) {
-                      setOrderTaker(taker.id);
-                      if (!taker.name.toLowerCase().includes("tahir sb")) {
-                        setCustomTotal(null); // restore normal total when switching away
-                      }
-                    }
-                  }}
+                .filter(
+                  (taker) =>
+                    !taker.name.toLowerCase().includes("tahir sb") || tahirPinActive // show Tahir Sb when mode active
+                )
+                .map((taker) => (
 
-                  className={`relative flex flex-col items-center p-4 rounded-2xl border-[2px] cursor-pointer transition-all ${orderTaker === taker.id ? "border-[#ff6600] bg-white/60 shadow-lg" : "border-transparent bg-white/30 hover:bg-white/50"
-                    } ${taker.balance <= 0 ? "opacity-50 cursor-not-allowed" : ""}`}
-                >
-                  <User className="w-10 h-10 mb-3 border border-[#ff6600]/40 rounded-xl" />
-                  <div className="text-center">
-                    <p className="text-sm text-gray-800">{taker.name}</p>
-                    <p className={`text-sm ${taker.balance > 0 ? "text-green-600" : "text-red-500"}`}>Balance: Rs. {taker.balance}</p>
+                  <div
+                    key={taker.id}
+                    onClick={() => {
+                      if (taker.balance > 0) {
+                        setOrderTaker(taker.id);
+                        if (!taker.name.toLowerCase().includes("tahir sb")) {
+                          setCustomTotal(null); // restore normal total when switching away
+                        }
+                      }
+                    }}
+
+                    className={`relative flex flex-col items-center p-4 rounded-2xl border-[2px] cursor-pointer transition-all ${orderTaker === taker.id ? "border-[#ff6600] bg-white/60 shadow-lg" : "border-transparent bg-white/30 hover:bg-white/50"
+                      } ${taker.balance <= 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <User className="w-10 h-10 mb-3 border border-[#ff6600]/40 rounded-xl" />
+                    <div className="text-center">
+                      <p className="text-sm text-gray-800">{taker.name}</p>
+                      <p className={`text-sm ${taker.balance > 0 ? "text-green-600" : "text-red-500"}`}>Balance: Rs. {taker.balance}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
             <Label>Tahir Sb</Label>
             <img
@@ -336,6 +360,11 @@ if (!currentTaker) {
                 }
               }}
             />
+            {tahirPinActive && (
+              <p className="text-sm text-[#ff6600] font-semibold mt-2">
+                Tahir Sb (Admin Mode Active)
+              </p>
+            )}
 
 
           </CardContent>
@@ -416,7 +445,6 @@ if (!currentTaker) {
             </DialogHeader>
             <div className="space-y-3">
               <p className="font-medium text-black">{selectedProduct.name}</p>
-              <p className="text-sm text-gray-500">{selectedProduct.category}</p>
               <div className="flex gap-3 mt-3">
                 {["Full Plate", "Half Plate"].map((type) => (
                   <Button

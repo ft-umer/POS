@@ -110,7 +110,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
     try {
       const res = await axios.get(`${ORDERTAKERS_URL}`);
 
-      // Map DB results -> frontend format (normalize IDs)
+      // Normalize
       const formatted = res.data.map((taker: any) => ({
         id: taker._id,
         name: taker.name,
@@ -119,13 +119,9 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
         imageUrl: taker.imageUrl || "",
       }));
 
-      // Filter out Tahir Sb
-      const filtered = formatted.filter(
-        (taker) => taker.name.toLowerCase() !== "tahir sb"
-      );
-
-      setOrderTakers(filtered);
-      localStorage.setItem("pos_orderTakers", JSON.stringify(filtered));
+      // ✅ DO NOT filter Tahir Sb here — keep all in DB and localStorage
+      setOrderTakers(formatted);
+      localStorage.setItem("pos_orderTakers", JSON.stringify(formatted));
     } catch (err) {
       console.error("Error fetching order takers:", err);
 
@@ -137,6 +133,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
 
   fetchOrderTakers();
 }, []);
+
 
 
   // 🔒 Safe axios wrapper
