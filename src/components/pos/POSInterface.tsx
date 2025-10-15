@@ -70,7 +70,20 @@ const POSInterface = () => {
 
   // Print and complete sale
   const handlePrintBill = () => {
-    if (!currentTaker) return toast({ title: "Select Order Taker", description: "Please choose an order taker." });
+   // ✅ Allow Tahir Sb to bypass the "please choose" error
+if (!currentTaker) {
+  const tahirSelected = orderTakers.some((t) =>
+    t.name.toLowerCase().includes("tahir sb")
+  );
+
+  if (!(tahirPinActive && tahirSelected)) {
+    return toast({
+      title: "Select Order Taker",
+      description: "Please choose an order taker.",
+    });
+  }
+}
+
     if (currentTaker.balance < cartTotal)
       return toast({
         title: "Insufficient Balance",
