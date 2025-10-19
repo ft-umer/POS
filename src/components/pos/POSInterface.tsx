@@ -132,9 +132,21 @@ const POSInterface = () => {
     <html><head><title>${invoiceId}</title>
       <style>
         body { font-family: 'Courier New', monospace; width: 58mm; margin: 0 auto; padding: 10px; text-align: center; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 17px; font-weight:bold; margin-top: 10px; }
         td { padding: 2px 0; }
         .separator { border-top: 1px dashed #000; margin: 8px 0; }
+        
+         .footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        margin-top: 6px;
+      }
+         p{
+           font-weight: bold;
+         }
       </style>
     </head>
     <body>
@@ -154,6 +166,13 @@ const POSInterface = () => {
       <p>Order Type: ${orderType}</p>
       <p>Order Taker: ${finalTaker.name}</p>
       <p>Payment: ${paymentMethod}</p>
+      <br />
+      <div class="footer">
+      <p>Powered By: <b>Egency Digital</b></p>
+      <span>|</span>
+      <p>Contact:</p>
+      <p><b>0325 0525254</b></p>
+      </div>
     </body>
     </html>
   `;
@@ -186,7 +205,7 @@ const POSInterface = () => {
     setResetLoading(true);
     try {
       // Reset logic – clear sales data from backend and frontend
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/sales/reset`, { method: "DELETE" }).catch(() => { });
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || "https://pos-backend-kappa.vercel.app"}/sales/reset`, { method: "DELETE" }).catch(() => { });
 
       // Local fallback: clear from localStorage
       localStorage.removeItem("pos_sales");

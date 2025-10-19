@@ -26,7 +26,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const API_BASE = "http://localhost:5000"; // backend URL
+const API_BASE = "https://pos-backend-kappa.vercel.app"; // backend URL
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -66,23 +66,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // ✅ Logout
-  const logout = async () => {
-    if (!token) return;
-    try {
-      await axios.post(`${API_BASE}/logout`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-    } catch (err) {
-      console.warn("Logout error", err);
-    } finally {
-      setUser(null);
-      setToken(null);
-      setIsAuthenticated(false);
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-    }
-  };
+// ✅ Instant Logout
+const logout = async () => {
+  // 1️⃣ Clear local state immediately
+  setUser(null);
+  setToken(null);
+  setIsAuthenticated(false);
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+
+  // 2️⃣ Make the backend request in the background
+  if (token) {
+    axios.post(`${API_BASE}/logout`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    .catch(err => console.warn("Logout error", err));
+  }
+};
+
 
   // ✅ Fetch all users (superadmin only)
   const fetchUsers = async () => {

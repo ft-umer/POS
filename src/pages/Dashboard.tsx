@@ -95,7 +95,7 @@ const Dashboard = () => {
         <aside
           className={`fixed md:sticky top-[60px] md:top-0 left-0 z-40
             w-64 md:w-60 min-h-[calc(100vh-60px)] 
-            bg-white/15 backdrop-blur-lg border-r pt-4 border-white/30 shadow-lg
+            bg-white/15 backdrop-blur-lg border-r pt-4 border-gray-200
             transition-transform duration-300 ease-in-out
             ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}
         >
@@ -121,7 +121,7 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <main className="flex-1 p-4 sm:p-6 overflow-x-hidden">
-          <div className="bg-white/40 backdrop-blur-lg rounded-2xl border border-white/30 shadow-md p-4 sm:p-6">
+          <div className="bg-white/40 backdrop-blur-lg rounded-2xl border border-white/30 p-4 sm:p-6">
             <Routes>
               <Route path="/" element={<POSInterface />} />
               <Route path="/products" element={<Products />} />
@@ -137,6 +137,10 @@ const Dashboard = () => {
           </div>
         </main>
       </div>
+      {/* Footer */}
+      <footer className="w-full py-4 text-center border-t border-gray-400 text-sm text-gray-600 bg-white/20 backdrop-blur-sm border-t border-white/30 mt-auto">
+        Developed by <a href="https://egencydigital.com" className="text-orange-500 font-medium hover:underline" target="_blank" rel="noopener noreferrer">Egency Digital</a>
+      </footer>
     </div>
   );
 };
