@@ -335,6 +335,7 @@ const handleSubmit = async (e: React.FormEvent) => {
       </CardContent>
     </Card>
   );
+  
 };
 
 export default Products;

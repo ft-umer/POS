@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePOS, OrderType, CartItem, Product } from "@/contexts/POSContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,9 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Search, Trash2, Plus, Minus, Printer, User } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { BrowserMultiFormatReader } from "@zxing/library";
+
+
 
 const POSInterface = () => {
   const {
@@ -129,53 +132,68 @@ const POSInterface = () => {
     </tr>`).join("");
 
     const printContent = `
-    <html><head><title>${invoiceId}</title>
-      <style>
-        body { font-family: 'Courier New', monospace; width: 58mm; margin: 0 auto; padding: 10px; text-align: center; }
-        table { width: 100%; border-collapse: collapse; font-size: 17px; font-weight:bold; margin-top: 10px; }
-        td { padding: 2px 0; }
-        .separator { border-top: 1px dashed #000; margin: 8px 0; }
-        
-         .footer {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 6px;
-        font-size: 11px;
-        margin-top: 6px;
+<html>
+  <head>
+    <title>${invoiceId}</title>
+    <style>
+      @page { size: auto; margin: 0; }
+      body {
+        font-family: 'Courier New', monospace;
+        width: 58mm;
+        margin: 0 auto;
+        padding: 10px;
+        text-align: center;
       }
-         p{
-           font-weight: bold;
-         }
-      </style>
-    </head>
-    <body>
-      <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png" style="width:90px; margin-bottom:10px;" />
-      <h2>Tahir Fruit Chaat</h2>
-      <p>${date}</p>
-      <div class="separator"></div>
-      <h3>INVOICE</h3>
-      <p><b>${invoiceId}</b></p>
-      <div class="separator"></div>
-      <table>
-        <thead><tr><td>Item</td><td>Qty</td><td>Amount</td></tr></thead>
-        <tbody>${itemsHTML}</tbody>
-      </table>
-      <div class="separator"></div>
-      <p>Total: ${effectiveTotal.toFixed(2)} PKR</p>
-      <p>Order Type: ${orderType}</p>
-      <p>Order Taker: ${finalTaker.name}</p>
-      <p>Payment: ${paymentMethod}</p>
-      <br />
-      <div class="footer">
+      table { width: 100%; border-collapse: collapse; font-size: 17px; font-weight: bold; margin-top: 10px; }
+      td { padding: 2px 0; }
+      .separator { border-top: 1px dashed #000; margin: 8px 0; }
+      .footer { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 11px; margin-top: 6px; }
+      p { font-weight: bold; }
+
+      /* 🧾 Forces the printer to stop after this element */
+      .end-of-bill {
+        page-break-after: always;
+      }
+    </style>
+  </head>
+  <body>
+    <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png"
+         style="width:90px; margin-bottom:10px;" />
+    <h2>Tahir Fruit Chaat</h2>
+    <p>${date}</p>
+    <div class="separator"></div>
+    <h3>INVOICE</h3>
+    <p><b>${invoiceId}</b></p>
+    <div class="separator"></div>
+    <table>
+      <thead><tr><td>Item</td><td>Qty</td><td>Amount</td></tr></thead>
+      <tbody>${itemsHTML}</tbody>
+    </table>
+    <div class="separator"></div>
+    <p>Total: ${effectiveTotal.toFixed(2)} PKR</p>
+    <p>Order Type: ${orderType}</p>
+    <p>Order Taker: ${finalTaker.name}</p>
+    <p>Payment: ${paymentMethod}</p>
+    <br />
+    <div class="footer">
       <p>Powered By: <b>Egency Digital</b></p>
       <span>|</span>
-      <p>Contact:</p>
-      <p><b>0325 0525254</b></p>
-      </div>
-    </body>
-    </html>
-  `;
+      <p>Contact: <b>0325 0525254</b></p>
+    </div>
+
+    <!-- 🧾 Mark end of bill -->
+    <div class="end-of-bill"></div>
+
+    <script>
+      window.onload = () => {
+        window.print();
+        setTimeout(() => window.close(), 1000);
+      };
+    </script>
+  </body>
+</html>
+`;
+
 
     const newWindow = window.open("", "_blank", "width=400,height=600");
     newWindow?.document.write(printContent);
@@ -221,6 +239,113 @@ const POSInterface = () => {
       setPinInput("");
     }
   };
+
+
+  // ---------------- Tahir Sb QR Scanner Logic ----------------
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+    } catch (err) {
+      console.error("Camera access error:", err);
+      toast({
+        title: "Camera Access Denied",
+        description: "Please allow camera access to scan QR codes.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current?.srcObject) {
+      (videoRef.current.srcObject as MediaStream)
+        .getTracks()
+        .forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+    setScanning(false);
+    codeReaderRef.current?.reset();
+  };
+
+  const startScanning = async () => {
+    if (!videoRef.current) return;
+    setScanning(true);
+
+    if (!codeReaderRef.current)
+      codeReaderRef.current = new BrowserMultiFormatReader();
+
+    try {
+      const result = await codeReaderRef.current.decodeOnceFromVideoDevice(
+        undefined,
+        videoRef.current
+      );
+      handleScanResult(result.getText());
+    } catch (err) {
+      console.error("QR scan error:", err);
+      toast({
+        title: "Scan Failed",
+        description: "Unable to read QR code. Try again.",
+        variant: "destructive",
+      });
+    } finally {
+      stopCamera();
+    }
+  };
+
+ const handleScanResult = (text: string) => {
+  if (!text) {
+    toast({
+      title: "Invalid QR Code",
+      description: "No data found in QR.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  // ✅ Check for the exact code "0000786"
+  if (text.trim() === "0000786") {
+    setTahirPinActive(true);
+    setCustomTotal(0);
+
+    toast({
+      title: "Tahir Sb Mode Activated ✅",
+      description: "Access granted successfully.",
+    });
+  } else {
+    toast({
+      title: "QR Not Recognized",
+      description: "Only Tahir Sb QR code is valid.",
+      variant: "destructive",
+    });
+  }
+
+  setShowQRScanner(false);
+};
+
+  // Auto start/stop camera when modal opens/closes
+  useEffect(() => {
+    if (showQRScanner) {
+      startCamera();
+      // Wait for stream before decoding
+      setTimeout(() => startScanning(), 700);
+    } else stopCamera();
+
+    return () => stopCamera();
+  }, [showQRScanner]);
+
 
 
   return (
@@ -344,47 +469,56 @@ const POSInterface = () => {
                   </div>
                 ))}
             </div>
-            <Label>Tahir Sb</Label>
-            <img
-              src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png"
-              className="w-20 h-20 cursor-pointer hover:scale-105 transition-transform"
-              alt="Tahir Sb"
-              onClick={() => {
-                const pin = prompt("Enter PIN to activate Tahir Sb mode:");
+            <div>
+              <Label>Tahir Sb</Label>
 
-                if (pin === "0000786") {
-                  // ✅ Find Tahir Sb from order takers
-                  const tahir = orderTakers.find((t) =>
-                    t.name.toLowerCase().includes("tahir sb")
-                  );
+              <img
+                src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png"
+                alt="Tahir Sb"
+                className="w-20 h-20 cursor-pointer hover:scale-105 transition-transform"
+                onClick={() => setShowQRScanner(true)}
+              />
 
-                  if (tahir) {
-                    setOrderTaker(tahir.id); // ✅ select Tahir Sb as active order taker
-                  }
+              {tahirPinActive && (
+                <p className="text-sm text-[#ff6600] font-semibold mt-2">
+                  Tahir Sb (Admin Mode Active)
+                </p>
+              )}
 
-                  setCustomTotal(0); // ✅ make bill 0
-                  setTahirPinActive(true); // ✅ enable zero-bill mode
+              <Dialog open={showQRScanner} onOpenChange={setShowQRScanner}>
+                <DialogContent className="max-w-sm text-center">
+                  <DialogHeader>
+                    <DialogTitle>Scan Tahir Sb QR Code</DialogTitle>
+                  </DialogHeader>
 
-                  toast({
-                    title: "Tahir Sb Mode Activated",
-                    description: "Order taker set to Tahir Sb and total bill set to 0 PKR.",
-                    className: "bg-green-500 text-white",
-                  });
-                } else if (pin && pin.trim() !== "") {
-                  toast({
-                    title: "Incorrect PIN",
-                    description: "Please enter the correct PIN to put Tahir sb's sale.",
-                    className: "bg-red-500 text-white",
-                  });
-                  setTahirPinActive(false);
-                }
-              }}
-            />
-            {tahirPinActive && (
-              <p className="text-sm text-[#ff6600] font-semibold mt-2">
-                Tahir Sb (Admin Mode Active)
-              </p>
-            )}
+                  <div className="flex flex-col gap-3 mt-3">
+                    <div className="relative">
+                      <video
+                        ref={videoRef}
+                        className="w-full rounded-md border border-gray-300"
+                      />
+                      {!cameraActive && (
+                        <p className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+                          Initializing camera...
+                        </p>
+                      )}
+                    </div>
+
+                    {scanning && (
+                      <p className="text-xs text-gray-500 animate-pulse">Scanning...</p>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    className="mt-4 w-full"
+                    onClick={() => setShowQRScanner(false)}
+                  >
+                    Cancel
+                  </Button>
+                </DialogContent>
+              </Dialog>
+            </div>
 
 
           </CardContent>
