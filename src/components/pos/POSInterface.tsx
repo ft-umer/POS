@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Search, Trash2, Plus, Minus, Printer, User } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { BrowserMultiFormatReader } from "@zxing/library";
+import { generateInvoiceId } from "@/utils/generateInvoice";
 
 
 
@@ -121,7 +122,7 @@ const POSInterface = () => {
     completeSale(paymentMethod, orderType, finalTaker.id);
 
     // build and open print window (use effectiveTotal in printed invoice)
-    const invoiceId = "INV-" + invoiceNumber.toString().padStart(6, "0");
+    const invoiceId = generateInvoiceId(); // ✅ Sequential Invoice ID
     const date = new Date().toLocaleString();
 
     const itemsHTML = cart.map(item => `
@@ -131,7 +132,14 @@ const POSInterface = () => {
       <td style="text-align:right;">${(item.selectedPrice * item.quantity).toFixed(2)}</td>
     </tr>`).join("");
 
-    const printContent = `
+// Keep real cart total separately so Tahir mode doesn't affect it
+const realTotal = cart.reduce((acc, item) => acc + item.selectedPrice * item.quantity, 0);
+
+// Payable depends on Tahir Sb Mode
+const displayPayable = isTahirMode ? 0 : realTotal;
+const displayTotal = realTotal;
+
+const printContent = `
 <html>
   <head>
     <title>${invoiceId}</title>
@@ -146,42 +154,58 @@ const POSInterface = () => {
       }
       table { width: 100%; border-collapse: collapse; font-size: 17px; font-weight: bold; margin-top: 10px; }
       td { padding: 2px 0; }
-      .separator { border-top: 1px dashed #000; margin: 8px 0; }
-      .footer { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 11px; margin-top: 6px; }
-      p { font-weight: bold; }
-
-      /* 🧾 Forces the printer to stop after this element */
-      .end-of-bill {
-        page-break-after: always;
+      .separator { border-top: 1px dashed #000; margin: 4px 0; }
+      .footer { 
+        display: flex; 
+        flex-direction: column;
+        justify-content: center; 
+        align-items: center; 
+        font-size: 11px; 
+        margin-top: 8px; 
       }
+      .footer p { margin: 2px 0; font-weight: bold; }
+      p { font-weight: bold; margin: 4px 0; }
+      .date { font-size:14px; }
+      .payable-waived {
+        color: gray;
+        font-style: italic;
+      }
+      .waived-flag {
+        color: #ff3b3b;
+        font-weight: bold;
+        font-size: 12px;
+        margin-left: 4px;
+      }
+      .end-of-bill { page-break-after: always; }
     </style>
   </head>
   <body>
     <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png"
          style="width:90px; margin-bottom:10px;" />
     <h2>Tahir Fruit Chaat</h2>
-    <p>${date}</p>
+    <p class="date">${date}</p>
     <div class="separator"></div>
-    <h3>INVOICE</h3>
-    <p><b>${invoiceId}</b></p>
+    <p><b>INVOICE: ${invoiceId}</b></p>
     <div class="separator"></div>
     <table>
       <thead><tr><td>Item</td><td>Qty</td><td>Amount</td></tr></thead>
       <tbody>${itemsHTML}</tbody>
     </table>
     <div class="separator"></div>
-    <p>Total: ${effectiveTotal.toFixed(2)} PKR</p>
+    <p>Total: ${displayTotal.toFixed(2)} PKR</p>
+    <p class="${isTahirMode ? "payable-waived" : ""}">
+      Payable: ${displayPayable.toFixed(2)} PKR
+      
+    </p>
     <p>Order Type: ${orderType}</p>
     <p>Order Taker: ${finalTaker.name}</p>
     <p>Payment: ${paymentMethod}</p>
     <br />
     <div class="footer">
       <p>Powered By: <b>Egency Digital</b></p>
-      <span>|</span>
       <p>Contact: <b>0325 0525254</b></p>
     </div>
 
-    <!-- 🧾 Mark end of bill -->
     <div class="end-of-bill"></div>
 
     <script>
@@ -193,6 +217,8 @@ const POSInterface = () => {
   </body>
 </html>
 `;
+
+
 
 
     const newWindow = window.open("", "_blank", "width=400,height=600");
@@ -295,45 +321,41 @@ const POSInterface = () => {
       handleScanResult(result.getText());
     } catch (err) {
       console.error("QR scan error:", err);
-      toast({
-        title: "Scan Failed",
-        description: "Unable to read QR code. Try again.",
-        variant: "destructive",
-      });
+
     } finally {
       stopCamera();
     }
   };
 
- const handleScanResult = (text: string) => {
-  if (!text) {
-    toast({
-      title: "Invalid QR Code",
-      description: "No data found in QR.",
-      variant: "destructive",
-    });
-    return;
-  }
+  const handleScanResult = (text: string) => {
+    if (!text) {
+      toast({
+        title: "Invalid QR Code",
+        description: "No data found in QR.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  // ✅ Check for the exact code "0000786"
-  if (text.trim() === "0000786") {
-    setTahirPinActive(true);
-    setCustomTotal(0);
+    // ✅ Check for the exact code "0000786"
+    if (text.trim() === "0000786") {
+      setTahirPinActive(true);
+      setCustomTotal(0);
 
-    toast({
-      title: "Tahir Sb Mode Activated ✅",
-      description: "Access granted successfully.",
-    });
-  } else {
-    toast({
-      title: "QR Not Recognized",
-      description: "Only Tahir Sb QR code is valid.",
-      variant: "destructive",
-    });
-  }
+      toast({
+        title: "Tahir Sb Mode Activated ✅",
+        description: "Access granted successfully.",
+      });
+    } else {
+      toast({
+        title: "QR Not Recognized",
+        description: "Only Tahir Sb QR code is valid.",
+        variant: "destructive",
+      });
+    }
 
-  setShowQRScanner(false);
-};
+    setShowQRScanner(false);
+  };
 
   // Auto start/stop camera when modal opens/closes
   useEffect(() => {
@@ -346,6 +368,24 @@ const POSInterface = () => {
     return () => stopCamera();
   }, [showQRScanner]);
 
+  const handleManualPinSubmit = () => {
+    if (pinInput.trim() === "0000786") {
+      setTahirPinActive(true);
+      setCustomTotal(0);
+      toast({
+        title: "Tahir Sb Mode Activated ✅",
+        description: "Access granted successfully via manual PIN.",
+      });
+      setShowQRScanner(false);
+      setPinInput("");
+    } else {
+      toast({
+        title: "Invalid PIN",
+        description: "Only Tahir Sb PIN is valid.",
+        variant: "destructive",
+      });
+    }
+  };
 
 
   return (
@@ -488,9 +528,10 @@ const POSInterface = () => {
               <Dialog open={showQRScanner} onOpenChange={setShowQRScanner}>
                 <DialogContent className="max-w-sm text-center">
                   <DialogHeader>
-                    <DialogTitle>Scan Tahir Sb QR Code</DialogTitle>
+                    <DialogTitle>Activate Tahir Sb Mode</DialogTitle>
                   </DialogHeader>
 
+                  {/* ✅ QR SCANNER AREA */}
                   <div className="flex flex-col gap-3 mt-3">
                     <div className="relative">
                       <video
@@ -509,6 +550,29 @@ const POSInterface = () => {
                     )}
                   </div>
 
+                  <Separator className="my-4" />
+
+                  {/* ✅ MANUAL ENTRY OPTION */}
+                  <div className="flex flex-col items-center gap-3">
+                    <Label className="text-sm text-gray-700">Or Enter PIN Manually</Label>
+                    <Input
+                      type="text"
+                      placeholder="Enter PIN (e.g., 0000786)"
+                      className="text-center border-gray-300 focus:border-[#ff6600] w-full"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleManualPinSubmit();
+                      }}
+                      value={pinInput}
+                      onChange={(e) => setPinInput(e.target.value)}
+                    />
+                    <Button
+                      className="w-full bg-[#ff6600] text-white hover:bg-[#e65c00]"
+                      onClick={handleManualPinSubmit}
+                    >
+                      Activate
+                    </Button>
+                  </div>
+
                   <Button
                     variant="outline"
                     className="mt-4 w-full"
@@ -518,6 +582,7 @@ const POSInterface = () => {
                   </Button>
                 </DialogContent>
               </Dialog>
+
             </div>
 
 
