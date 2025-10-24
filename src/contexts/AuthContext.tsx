@@ -34,6 +34,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [users, setUsers] = useState<User[]>([]);
+  
+useEffect(() => {
+  let isRefreshing = false;
+
+  // Detect refresh intent
+  window.addEventListener("keydown", (e) => {
+    if ((e.key === "F5") || (e.ctrlKey && e.key === "r")) {
+      isRefreshing = true;
+    }
+  });
+
+  window.addEventListener("beforeunload", (e) => {
+    // Skip logout if refresh detected
+    if (isRefreshing) return;
+
+    // Skip logout if navigating inside same SPA
+    if (performance.getEntriesByType("navigation")[0]?.type === "reload") return;
+
+    // ✅ sendBeacon ensures backend logout works on close
+    if (token) {
+      try {
+        const blob = new Blob([JSON.stringify({})], {
+          type: "application/json",
+        });
+        navigator.sendBeacon(`${API_BASE}/logout`, blob);
+      } catch (err) {
+        console.warn("sendBeacon logout failed", err);
+      }
+    }
+
+    // ✅ Clear local storage to end session
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+  });
+
+  return () => {
+    window.removeEventListener("keydown", () => {});
+    window.removeEventListener("beforeunload", () => {});
+  };
+}, [token]);
+
+
+
 
   // ✅ On mount, restore session from localStorage
   useEffect(() => {

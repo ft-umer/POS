@@ -167,7 +167,7 @@ const AdminList = () => {
 
 
                               try {
-                                const res = await fetch(`http://localhost:5000/users/${admin._id}`, {
+                                const res = await fetch(`https://pos-backend-kappa.vercel.app/users/${admin._id}`, {
                                   method: "DELETE",
                                   headers: { Authorization: `Bearer ${token}` },
                                 });

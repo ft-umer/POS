@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -20,7 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { usePOS } from "@/contexts/POSContext";
 
 const OrderTakers = () => {
@@ -32,10 +33,11 @@ const OrderTakers = () => {
   const [formData, setFormData] = useState({
     name: "",
     balance: 0,
+    isSelf: false, // ✅ new field
   });
 
   const resetForm = () => {
-    setFormData({ name: "", balance: 0 });
+    setFormData({ name: "", balance: 0, isSelf: false });
     setEditingTaker(null);
   };
 
@@ -44,7 +46,7 @@ const OrderTakers = () => {
 
     const takerData = {
       ...formData,
-      balance: Number(formData.balance) || 0,
+      balance: formData.isSelf ? 0 : Number(formData.balance) || 0,
     };
 
     if (editingTaker) {
@@ -64,24 +66,43 @@ const OrderTakers = () => {
     setFormData({
       name: taker.name,
       balance: taker.balance ?? 0,
+      isSelf: taker.isSelf ?? false,
     });
     setIsOpen(true);
   };
+  
+  // State
+const [loading, setLoading] = useState<string | null>(null);
 
-  const handleDelete = (takerId: string) => {
-    deleteOrderTaker(takerId);
-    toast({ title: "Order taker deleted successfully" });
-  };
+// === HANDLE DELETE ===
+const handleDelete = async (takerId: string) => {
+  try {
+    setLoading(takerId); // show loader only for the specific product
+
+    await  deleteOrderTaker(takerId);
+    toast({
+      title: "OrderTaker deleted successfully",
+      variant: "success",
+    });
+  } catch (err) {
+    console.error("Error deleting OrderTaker:", err);
+    toast({
+      title: "Delete failed",
+      description: "Something went wrong while deleting the product.",
+      variant: "destructive",
+    });
+  } finally {
+    setLoading(null); // reset loader
+  }
+};
 
   return (
     <Card className="bg-background border border-border shadow-sm">
-      {/* Header */}
       <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 border-b border-border pb-3">
         <CardTitle className="text-xl sm:text-2xl font-semibold text-text">
           Order Takers Management
         </CardTitle>
 
-        {/* Dialog Trigger */}
         <Dialog
           open={isOpen}
           onOpenChange={(open) => {
@@ -120,24 +141,39 @@ const OrderTakers = () => {
                 />
               </div>
 
-
-
-              {/* Balance */}
-              <div className="space-y-2">
-                <Label htmlFor="balance" className="text-sm font-medium text-text">
-                  Balance (Rs.)
-                </Label>
-                <Input
-                  id="balance"
-                  type="number"
-                  value={formData.balance}
-                  onChange={(e) =>
-                    setFormData({ ...formData, balance: Number(e.target.value) })
+              {/* ✅ Self Order Checkbox */}
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="isSelf"
+                  checked={formData.isSelf}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, isSelf: !!checked })
                   }
-                  min={0}
-                  className="border-border focus:ring-2 focus:ring-primary"
                 />
+                <Label htmlFor="isSelf" className="text-sm font-medium text-text">
+                  Customer taking order by self
+                </Label>
               </div>
+
+              {/* Balance — only show if name is not "Customer" */}
+              {formData.name.toLowerCase() !== "open sale" && (
+                <div className="space-y-2">
+                  <Label htmlFor="balance" className="text-sm font-medium text-text">
+                    Balance (Rs.)
+                  </Label>
+                  <Input
+                    id="balance"
+                    type="number"
+                    value={formData.balance}
+                    onChange={(e) =>
+                      setFormData({ ...formData, balance: Number(e.target.value) })
+                    }
+                    min={0}
+                    className="border-border focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              )}
+
 
               <Button
                 type="submit"
@@ -157,7 +193,7 @@ const OrderTakers = () => {
             <TableHeader className="bg-orange-100">
               <TableRow>
                 <TableHead className="text-text font-semibold">Name</TableHead>
-                <TableHead className="text-text font-semibold">Balance</TableHead>
+                <TableHead className="text-text font-semibold">Balance / Type</TableHead>
                 <TableHead className="text-text font-semibold text-center">
                   Actions
                 </TableHead>
@@ -165,29 +201,20 @@ const OrderTakers = () => {
             </TableHeader>
             <TableBody>
               {orderTakers.length > 0 ? (
-                [...orderTakers].sort((a, b) => {
-                  const nameA = a.name.toLowerCase();
-                  const nameB = b.name.toLowerCase();
-
-                  // Tahir sb always comes first
-                  if (nameA.includes("tahir sb")) return -1;
-                  if (nameB.includes("tahir sb")) return 1;
-
-                  // Otherwise, sort alphabetically (optional)
-                  return nameA.localeCompare(nameB);
-                })
+                [...orderTakers]
+                  .sort((a, b) => a.name.localeCompare(b.name))
                   .map((taker) => (
                     <TableRow
                       key={taker.id}
-                      className={`hover:bg-orange-50 transition ${taker.name.toLowerCase().includes("tahir sb")
-                          ? "bg-green-100 hover:bg-green-200"
-                          : ""
+                      className={`hover:bg-orange-50 transition ${taker.isSelf ? "bg-blue-50" : ""
                         }`}
                     >
-                      <TableCell className="font-medium text-text">{taker.name}</TableCell>
+                      <TableCell className="font-medium text-text">
+                        {taker.name}
+                      </TableCell>
                       <TableCell className="text-green-700 font-semibold">
-                        {taker.name.toLowerCase().includes("tahir sb")
-                          ? "Unlimited"
+                        {taker.isSelf
+                          ? "Self Order"
                           : `Rs. ${(taker.balance ?? 0).toLocaleString()}`}
                       </TableCell>
                       <TableCell>
@@ -204,14 +231,18 @@ const OrderTakers = () => {
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(taker.id)}
-                            className="text-black hover:bg-red-100"
+                            disabled={loading === taker.id} // disable while deleting
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {loading === taker.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            )}
                           </Button>
+
                         </div>
                       </TableCell>
                     </TableRow>
-
                   ))
               ) : (
                 <TableRow>

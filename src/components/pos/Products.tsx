@@ -27,19 +27,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 
 const Products = () => {
-  const { products,updateProduct, addProduct, deleteProduct } = usePOS();
+  const { products, updateProduct, addProduct, deleteProduct } = usePOS();
   const [isOpen, setIsOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     fullPrice: "",
     halfPrice: "",
-    stock: "",
+    fullStock: "",
+    halfStock: "",
     category: "Tahir Fruit Chaat",
     barcode: "",
+    isSolo: false,
     imageUrl: "",
     imageFile: null as File | null,
   });
@@ -51,69 +53,86 @@ const Products = () => {
       name: "",
       fullPrice: "",
       halfPrice: "",
-      stock: "",
+      fullStock: "",
+      halfStock: "",
       category: "Tahir Fruit Chaat",
       barcode: "",
+      isSolo: false,
       imageUrl: "",
       imageFile: null,
     });
     setEditingProduct(null);
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  // Add state at the top
+  const [loadingProduct, setLoadingProduct] = useState(false);
 
-  try {
-    if (editingProduct) {
-      // For updates, call context updateProduct
-      await updateProduct(editingProduct, {
-        name: formData.name,
-        fullPrice: Number(formData.fullPrice),
-        halfPrice: Number(formData.halfPrice),
-        stock: Number(formData.stock),
-        category: formData.category,
-        barcode: formData.barcode,
-        imageUrl: formData.imageUrl,
+  // === HANDLE SUBMIT ===
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoadingProduct(true); // ✅ start loading
+
+    try {
+      if (editingProduct) {
+        // UPDATE PRODUCT
+        await updateProduct(editingProduct, {
+          name: formData.name,
+          fullPrice: Number(formData.fullPrice),
+          halfPrice: Number(formData.halfPrice),
+          fullStock: Number(formData.fullStock),
+          halfStock: Number(formData.halfStock),
+          category: formData.category,
+          barcode: formData.barcode,
+          isSolo: formData.isSolo,
+          imageUrl: formData.imageUrl,
+        });
+        toast({ title: "Product updated successfully" });
+      } else {
+        // ADD PRODUCT
+        const form = new FormData();
+        form.append("name", formData.name);
+        form.append("fullPrice", formData.fullPrice);
+        form.append("halfPrice", formData.halfPrice);
+        form.append("fullStock", formData.fullStock);
+        form.append("halfStock", formData.halfStock);
+        form.append("category", formData.category);
+        form.append("isSolo", String(formData.isSolo));
+        if (formData.barcode) form.append("barcode", formData.barcode);
+        if (formData.imageFile) form.append("image", formData.imageFile);
+
+        await addProduct(form);
+        toast({ title: "Product added successfully" });
+      }
+
+      resetForm();
+      setIsOpen(false);
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      toast({
+        title: "Error",
+        description: err.message,
+        variant: "destructive",
       });
-      toast({ title: "Product updated successfully" });
-    } else {
-      // For new products, use addProduct
-      const form = new FormData();
-      form.append("name", formData.name);
-      form.append("fullPrice", formData.fullPrice);
-      form.append("halfPrice", formData.halfPrice);
-      form.append("stock", formData.stock);
-      form.append("category", formData.category);
-      if (formData.barcode) form.append("barcode", formData.barcode);
-      if (formData.imageFile) form.append("image", formData.imageFile);
-
-      await addProduct(form);
-      toast({ title: "Product added successfully" });
+    } finally {
+      setLoadingProduct(false); // ✅ stop loading
     }
-
-    resetForm();
-    setIsOpen(false);
-  } catch (err: any) {
-    console.error("Submit error:", err);
-    toast({
-      title: "Error",
-      description: err.message,
-      variant: "destructive",
-    });
-  }
-};
+  };
 
 
-  // === HANDLE EDIT ===
+  // State
+  const [loading, setLoading] = useState<string | null>(null);
+    // === HANDLE EDIT ===
   const handleEdit = (product: any) => {
     setEditingProduct(product._id);
     setFormData({
       name: product.name,
-      fullPrice: product.fullPrice.toString(),
-      halfPrice: product.halfPrice.toString(),
-      stock: product.stock.toString(),
+      fullPrice: product.fullPrice?.toString() || "",
+      halfPrice: product.halfPrice?.toString() || "",
+      fullStock: product.fullStock?.toString() || "",
+      halfStock: product.halfStock?.toString() || "",
       category: product.category || "Tahir Fruit Chaat",
       barcode: product.barcode || "",
+      isSolo: product.isSolo || false,
       imageUrl: product.imageUrl || "",
       imageFile: null,
     });
@@ -121,9 +140,25 @@ const handleSubmit = async (e: React.FormEvent) => {
   };
 
   // === HANDLE DELETE ===
-  const handleDelete = (id: string) => {
-    deleteProduct(id);
-    toast({ title: "Product deleted successfully" });
+  const handleDelete = async (id: string) => {
+    try {
+      setLoading(id); // show loader only for the specific product
+
+      await deleteProduct(id);
+      toast({
+        title: "Product deleted successfully",
+        variant: "success",
+      });
+    } catch (err) {
+      console.error("Error deleting product:", err);
+      toast({
+        title: "Delete failed",
+        description: "Something went wrong while deleting the product.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(null); // reset loader
+    }
   };
 
   // === HANDLE IMAGE CHANGE ===
@@ -180,8 +215,8 @@ const handleSubmit = async (e: React.FormEvent) => {
                 />
               </div>
 
-              {/* === FULL & HALF PLATE PRICE === */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* === PRICES === */}
+              <div className={`grid gap-4 ${formData.isSolo ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
                 <div className="space-y-2">
                   <Label htmlFor="fullPrice">Full Plate Price (PKR)</Label>
                   <Input
@@ -195,32 +230,65 @@ const handleSubmit = async (e: React.FormEvent) => {
                   />
                 </div>
 
+                {!formData.isSolo && (
+                  <div className="space-y-2">
+                    <Label htmlFor="halfPrice">Half Plate Price (PKR)</Label>
+                    <Input
+                      id="halfPrice"
+                      type="number"
+                      value={formData.halfPrice}
+                      onChange={(e) =>
+                        setFormData({ ...formData, halfPrice: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* === STOCKS === */}
+              <div className={`grid gap-4 ${formData.isSolo ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2"}`}>
                 <div className="space-y-2">
-                  <Label htmlFor="halfPrice">Half Plate Price (PKR)</Label>
+                  <Label htmlFor="fullStock">Full Plate Stock</Label>
                   <Input
-                    id="halfPrice"
+                    id="fullStock"
                     type="number"
-                    value={formData.halfPrice}
+                    value={formData.fullStock}
                     onChange={(e) =>
-                      setFormData({ ...formData, halfPrice: e.target.value })
+                      setFormData({ ...formData, fullStock: e.target.value })
                     }
                     required
                   />
                 </div>
+
+                {!formData.isSolo && (
+                  <div className="space-y-2">
+                    <Label htmlFor="halfStock">Half Plate Stock</Label>
+                    <Input
+                      id="halfStock"
+                      type="number"
+                      value={formData.halfStock}
+                      onChange={(e) =>
+                        setFormData({ ...formData, halfStock: e.target.value })
+                      }
+                      required
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* === STOCK === */}
-              <div className="space-y-2">
-                <Label htmlFor="stock">Stock Quantity</Label>
-                <Input
-                  id="stock"
-                  type="number"
-                  value={formData.stock}
+
+              {/* === SOLO TOGGLE === */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isSolo"
+                  checked={formData.isSolo}
                   onChange={(e) =>
-                    setFormData({ ...formData, stock: e.target.value })
+                    setFormData({ ...formData, isSolo: e.target.checked })
                   }
-                  required
                 />
+                <Label htmlFor="isSolo">Solo Item (No Half Plate)</Label>
               </div>
 
               {/* === CATEGORY === */}
@@ -236,7 +304,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 />
               </div>
 
-              {/* === IMAGE UPLOAD === */}
+              {/* === IMAGE === */}
               <div className="space-y-2">
                 <Label htmlFor="image">Image</Label>
                 <Input
@@ -255,7 +323,11 @@ const handleSubmit = async (e: React.FormEvent) => {
                     <button
                       type="button"
                       onClick={() =>
-                        setFormData({ ...formData, imageUrl: "", imageFile: null })
+                        setFormData({
+                          ...formData,
+                          imageUrl: "",
+                          imageFile: null,
+                        })
                       }
                       className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                     >
@@ -268,9 +340,40 @@ const handleSubmit = async (e: React.FormEvent) => {
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-hover text-white shadow-md"
+                disabled={loadingProduct} // ✅ disable while loading
               >
-                {editingProduct ? "Update Product" : "Add Product"}
+                {loadingProduct
+                  ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <svg
+                        className="animate-spin h-5 w-5 text-white"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                        ></path>
+                      </svg>
+                      Saving...
+                    </div>
+                  )
+                  : editingProduct
+                    ? "Update Product"
+                    : "Add Product"
+                }
               </Button>
+
             </form>
           </DialogContent>
         </Dialog>
@@ -282,10 +385,12 @@ const handleSubmit = async (e: React.FormEvent) => {
           <Table>
             <TableHeader className="bg-orange-100">
               <TableRow>
-                <TableHead className="font-semibold text-black">Name</TableHead>
-                <TableHead>Full Plate Price</TableHead>
-                <TableHead>Half Plate Price</TableHead>
-                <TableHead>Stock</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Full Price</TableHead>
+                <TableHead>Half Price</TableHead>
+                <TableHead>Full Stock</TableHead>
+                <TableHead>Half Stock</TableHead>
+                <TableHead>Solo</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -302,15 +407,17 @@ const handleSubmit = async (e: React.FormEvent) => {
                     )}
                     {product.name}
                   </TableCell>
-                  <TableCell className="text-primary font-semibold">
-                    {product.fullPrice} PKR
-                  </TableCell>
-                  <TableCell className="text-primary font-semibold">
-                    {product.halfPrice} PKR
-                  </TableCell>
-                  <TableCell>{product.stock}</TableCell>
+                  <TableCell>{product.fullPrice} PKR</TableCell>
                   <TableCell>
-                    <div className="flex justify-start gap-2">
+                    {product.isSolo ? "—" : `${product.halfPrice} PKR`}
+                  </TableCell>
+                  <TableCell>{product.fullStock}</TableCell>
+                  <TableCell>
+                    {product.isSolo ? "—" : product.halfStock}
+                  </TableCell>
+                  <TableCell>{product.isSolo ? "✅" : "❌"}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -322,9 +429,15 @@ const handleSubmit = async (e: React.FormEvent) => {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDelete(product._id)}
+                        disabled={loading === product._id} // disable while deleting
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {loading === product._id ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        )}
                       </Button>
+
                     </div>
                   </TableCell>
                 </TableRow>
@@ -335,7 +448,6 @@ const handleSubmit = async (e: React.FormEvent) => {
       </CardContent>
     </Card>
   );
-  
 };
 
 export default Products;

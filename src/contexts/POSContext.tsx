@@ -71,6 +71,7 @@ interface POSContextType {
   completeSale: (paymentMethod: string, orderType: OrderType, orderTakerId: string) => void;
   updateSale: (saleId: string, updatedData: Partial<Sale>) => void;
   deleteSale: (saleId: string) => void;
+  deleteAllSales: () => void; // ✅ added here
 
   addOrderTaker: (taker: Omit<OrderTaker, "id">) => void;
   updateOrderTaker: (id: string, taker: Partial<OrderTaker>) => void;
@@ -250,22 +251,37 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // ============================
-  // Cart Management
-  const addToCart = (product: Product, plateType: "Full Plate" | "Half Plate") => {
-    const selectedPrice = plateType === "Full Plate" ? product.fullPrice : product.halfPrice;
+const addToCart = (product: Product, plateType?: "Full Plate" | "Half Plate") => {
+  const finalPlateType = product.isSolo ? "Full Plate" : plateType || "Full Plate";
+  const selectedPrice = finalPlateType === "Full Plate" ? product.fullPrice : product.halfPrice;
 
-    setCart((prev) => {
-      const existing = prev.find(item => item._id === product._id && item.plateType === plateType);
-      if (existing) {
-        return prev.map(item =>
-          item._id === product._id && item.plateType === plateType
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { ...product, quantity: 1, selectedPrice, plateType }];
-    });
-  };
+  setCart((prev) => {
+    const existing = prev.find(
+      (item) => item._id === product._id && item.plateType === finalPlateType
+    );
+
+    if (existing) {
+      return prev.map((item) =>
+        item._id === product._id && item.plateType === finalPlateType
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      );
+    }
+
+    return [
+      ...prev,
+      {
+        ...product,
+        quantity: 1,
+        selectedPrice,
+        plateType: finalPlateType,
+        fullStock: product.fullStock,
+        halfStock: product.halfStock,
+      },
+    ];
+  });
+};
+
 
 
   const removeFromCart = (_id: string, plateType: "Full Plate" | "Half Plate") => {
@@ -289,111 +305,156 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
   const [customTotal, setCustomTotal] = useState<number | null>(null);
 
 
-  // ============================
-  // Complete Sale (Online + Offline)
-  // ============================
-  const completeSale = async (
-    paymentMethod: string,
-    orderType: OrderType,
-    orderTakerId: string
-  ) => {
-    // Normal total calculation
-    let total = cart.reduce((sum, item) => sum + item.selectedPrice * item.quantity, 0);
+// ============================
+// Complete Sale (Online + Offline)
+// ============================
+const completeSale = async (
+  paymentMethod: string,
+  orderType: OrderType,
+  orderTakerId: string
+) => {
+  // if (!cart.length) return toast({ title: "Cart is empty", variant: "destructive" });
 
-    const taker = orderTakers.find((t) => t.id === orderTakerId);
-    if (!taker) return alert("Invalid order taker selected.");
+  // 1️⃣ Calculate normal total
+  let normalTotal = cart.reduce((sum, item) => sum + item.selectedPrice * item.quantity, 0);
 
-    // ✅ Enforce 0 total if Tahir Sb mode active
-    if (tahirPinActive && customTotal !== null) {
-      total = 0;
-    }
+  // 2️⃣ Identify order taker
+  const taker = orderTakers.find((t) => t.id === orderTakerId);
+  const isCustomer = !taker || taker.name.toLowerCase() === "open sale";
+  const isTahirMode = tahirPinActive && taker?.name.toLowerCase().includes("tahir sb");
 
-    // ✅ Skip balance check if Tahir Sb zero mode active
-    if (!tahirPinActive && taker.balance < total) {
-      return alert(`${taker.name} has insufficient balance.`);
-    }
+  // 3️⃣ Effective total (0 if Tahir Sb mode active)
+  const total = isTahirMode ? 0 : normalTotal;
 
-    const salePayload = {
-      items: cart.map((item) => ({
-        productId: item._id,
-        quantity: item.quantity,
-        price: item.selectedPrice,
-        plateType: item.plateType,
-      })),
+  // 4️⃣ Check balance for normal takers
+  if (!isCustomer && !isTahirMode && (taker!.balance < total)) {
+    return toast({
+      title: "Insufficient Balance",
+      description: `${taker!.name} has only ${taker!.balance.toFixed(2)} Rs available.`,
+      variant: "destructive",
+    });
+  }
+
+  // 5️⃣ Build sale payload
+  const salePayload = {
+    items: cart.map((item) => ({
+      productId: item._id,
+      quantity: item.quantity,
+      price: item.selectedPrice,
+      plateType: item.plateType,
+    })),
+    total,
+    paymentMethod,
+    orderType,
+    orderTaker: isCustomer ? "Open Sale" : taker!.name,
+  };
+
+  // 6️⃣ Save sale online or offline
+  let saleSaved: Sale;
+  const res = await safeRequest(() => axios.post(SALES_URL, salePayload));
+
+  if (res?.data) {
+    saleSaved = { ...res.data, id: res.data._id, date: res.data.createdAt };
+    // toast({ title: "✅ Sale completed successfully (Online)." });
+  } else {
+    saleSaved = {
+      id: Date.now().toString(),
+      items: cart,
       total,
+      date: new Date().toISOString(),
       paymentMethod,
       orderType,
-      orderTaker: taker.name,
+      orderTaker: isCustomer ? "Open Sale" : taker?.name || "Open Sale",
     };
+    // toast({ title: "✅ Sale saved offline (will sync later)." });
+  }
 
-    const res = await safeRequest(() => axios.post(SALES_URL, salePayload));
+  // 7️⃣ Update sales state & localStorage
+  setSales((prev) => [saleSaved, ...prev]);
+  localStorage.setItem("pos_sales", JSON.stringify([saleSaved, ...sales]));
 
-    if (res && res.data) {
-      const newSale: Sale = {
-        ...res.data,
-        id: res.data._id,
-        date: res.data.createdAt,
+ // 8️⃣ Update taker balance (skip Customer & Tahir Sb)
+if (!isCustomer && !isTahirMode && taker) {
+  const newBalance = (taker.balance || 0) - total;
+
+  setOrderTakers((prev) =>
+    prev.map((t) =>
+      t.id === taker.id ? { ...t, balance: newBalance } : t
+    )
+  );
+
+  safeRequest(() =>
+    axios.put(`${ORDERTAKERS_URL}/${taker.id}`, { balance: newBalance })
+  ).catch((err) =>
+    console.warn("⚠️ Could not update order taker balance in DB:", err)
+  );
+}
+
+
+  // 9️⃣ Update product stock
+  setProducts((prev) =>
+    prev.map((p) => {
+      const soldItems = cart.filter((c) => c._id === p._id);
+      if (!soldItems.length) return p;
+
+      let fullSold = 0;
+      let halfSold = 0;
+
+      soldItems.forEach((item) => {
+        if (item.plateType === "Full Plate") fullSold += item.quantity;
+        if (item.plateType === "Half Plate") halfSold += item.quantity;
+      });
+
+      const updatedProduct = {
+        ...p,
+        fullStock: (p.fullStock || 0) - fullSold,
+        halfStock: (p.halfStock || 0) - halfSold,
+        totalStock: ((p.fullStock || 0) - fullSold) + ((p.halfStock || 0) - halfSold),
       };
-      const updatedSales = [newSale, ...sales];
-      setSales(updatedSales);
-      localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
-      toast("✅ Sale completed successfully (Online).");
-    } else {
-      const offlineSale: Sale = {
-        id: Date.now().toString(),
-        items: cart,
-        total,
-        date: new Date().toISOString(),
-        paymentMethod,
-        orderType,
-        orderTaker: taker.name,
-      };
-      const updatedSales = [offlineSale, ...sales];
-      setSales(updatedSales);
-      localStorage.setItem("pos_sales", JSON.stringify(updatedSales));
-      alert("✅ Sale saved offline (will sync later).");
-    }
 
-    // ✅ Update balance both locally & in DB
-    setOrderTakers((prev) =>
-      prev.map((t) =>
-        t.id === orderTakerId
-          ? { ...t, balance: t.balance - (tahirPinActive ? 0 : total) }
-          : t
-      )
-    );
+      safeRequest(() =>
+        axios.put(`${PRODUCTS_URL}/${p._id}`, {
+          fullStock: updatedProduct.fullStock,
+          halfStock: updatedProduct.halfStock,
+          totalStock: updatedProduct.totalStock,
+        })
+      );
 
-    // ✅ Persist updated balance in backend (if not Tahir mode)
-    if (!tahirPinActive) {
-      try {
-        const taker = orderTakers.find((t) => t.id === orderTakerId);
-        if (taker) {
-          await safeRequest(() =>
-            axios.put(`${ORDERTAKERS_URL}/${orderTakerId}`, {
-              balance: taker.balance - total,
-            })
-          );
-        }
-      } catch (err) {
-        console.warn("⚠️ Could not update order taker balance in DB:", err);
-      }
-    }
+      return updatedProduct;
+    })
+  );
+
+  // 1️⃣0️⃣ Clear cart & reset Tahir Sb mode
+  clearCart();
+  setTahirPinActive(false);
+  setCustomTotal(null);
+};
+
+// ============================
+// Delete All Sales (Online + Offline)
+// ============================
+const deleteAllSales = async () => {
+  // Try online first
+  await safeRequest(() => axios.delete(`${SALES_URL}/all`)); // assumes backend endpoint exists
+  // Reset local state
+  setSales([]);
+  localStorage.setItem("pos_sales", JSON.stringify([]));
+
+  // Reset order taker balances (refund all sales)
+  setOrderTakers(prev =>
+    prev.map(taker => {
+      // Sum all sales by this taker
+      const takerSalesTotal = sales
+        .filter(s => s.orderTaker === taker.name)
+        .reduce((sum, s) => sum + s.total, 0);
+      return { ...taker, balance: taker.balance + takerSalesTotal };
+    })
+  );
+
+  toast("All sales records have been removed successfully.");
+};
 
 
-    // ✅ Update product stock normally
-    setProducts((prev) =>
-      prev.map((p) => {
-        const cartItem = cart.find((c) => c._id === p._id);
-        return cartItem ? { ...p, stock: p.stock - cartItem.quantity } : p;
-      })
-    );
-
-    clearCart();
-
-    // ✅ Optional: reset Tahir mode after sale
-    setTahirPinActive(false);
-    setCustomTotal(null);
-  };
 
   // ============================
   // Update & Delete Sale (Online + Offline)
@@ -480,6 +541,7 @@ export const POSProvider = ({ children }: { children: ReactNode }) => {
         addToCart,
         removeFromCart,
         updateCartQuantity,
+        deleteAllSales,
         clearCart,
         completeSale,
         updateSale,

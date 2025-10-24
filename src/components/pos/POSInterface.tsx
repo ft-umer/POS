@@ -73,44 +73,34 @@ const POSInterface = () => {
   }, [currentTaker]);
 
   const handlePrintBill = () => {
-    // Find Tahir Sb in the full orderTakers list (context now contains him).
-    const tahirTaker = orderTakers.find((t) =>
-      t.name.toLowerCase().includes("tahir sb")
-    );
+    // Find Tahir Sb in takers list
+    const tahirTaker = orderTakers.find(t => t.name.toLowerCase().includes("tahir sb"));
+    const selectedTaker = orderTakers.find(t => t.id === orderTaker);
 
-    // current selected taker (may be undefined)
-    const selectedTaker = orderTakers.find((t) => t.id === orderTaker);
-
-    // Is Tahir mode active AND is Tahir present in list?
     const isTahirMode = tahirPinActive && !!tahirTaker;
 
-    // Choose which taker will be used for the sale
+    // Decide final taker
     const finalTaker = isTahirMode ? tahirTaker : selectedTaker;
 
-    // If no taker found and NOT Tahir-mode, ask user to select one.
+    // If no taker selected
     if (!finalTaker) {
-      // if Tahir-mode was requested but Tahir is missing, show clear error
-      if (tahirPinActive && !tahirTaker) {
-        return toast({
-          title: "Tahir Sb missing",
-          description: "Tahir Sb is not available in order takers list.",
-          variant: "destructive",
-        });
-      }
-
       return toast({
         title: "Select Order Taker",
-        description: "Please choose an order taker.",
+        description: "Please choose an order taker before printing.",
         variant: "destructive",
       });
     }
 
-    // Calculate totals
+    // Handle totals
     const normalTotal = cart.reduce((sum, item) => sum + item.selectedPrice * item.quantity, 0);
     const effectiveTotal = isTahirMode ? 0 : normalTotal;
 
-    // Balance check only when NOT Tahir-mode
-    if (!isTahirMode && (finalTaker.balance ?? 0) < effectiveTotal) {
+    // ✅ Balance check only for non-Tahir, non-Customer takers
+    if (
+      !isTahirMode &&
+      finalTaker.name.toLowerCase() !== "open sale" &&
+      (finalTaker.balance ?? 0) < effectiveTotal
+    ) {
       return toast({
         title: "Insufficient Balance",
         description: `${finalTaker.name} has only ${(finalTaker.balance ?? 0).toFixed(2)} Rs available.`,
@@ -118,28 +108,28 @@ const POSInterface = () => {
       });
     }
 
-    // call completeSale with the final taker's id
+    // ✅ Build sale payload (always save in DB)
     completeSale(paymentMethod, orderType, finalTaker.id);
 
-    // build and open print window (use effectiveTotal in printed invoice)
-    const invoiceId = generateInvoiceId(); // ✅ Sequential Invoice ID
+    // Build invoice
+    const invoiceId = generateInvoiceId();
     const date = new Date().toLocaleString();
 
-    const itemsHTML = cart.map(item => `
+    const itemsHTML = cart
+      .map(
+        (item) => `
     <tr>
       <td style="text-align:left;">${item.name} ${item.plateType ? `(${item.plateType})` : ""}</td>
       <td style="text-align:center;">${item.quantity}</td>
       <td style="text-align:right;">${(item.selectedPrice * item.quantity).toFixed(2)}</td>
-    </tr>`).join("");
+    </tr>`
+      )
+      .join("");
 
-// Keep real cart total separately so Tahir mode doesn't affect it
-const realTotal = cart.reduce((acc, item) => acc + item.selectedPrice * item.quantity, 0);
+    const realTotal = normalTotal;
+    const displayPayable = isTahirMode ? 0 : realTotal;
 
-// Payable depends on Tahir Sb Mode
-const displayPayable = isTahirMode ? 0 : realTotal;
-const displayTotal = realTotal;
-
-const printContent = `
+    const printContent = `
 <html>
   <head>
     <title>${invoiceId}</title>
@@ -152,6 +142,11 @@ const printContent = `
         padding: 10px;
         text-align: center;
       }
+      
+      .tfc{
+        font-size:15px;
+      }
+      
       table { width: 100%; border-collapse: collapse; font-size: 17px; font-weight: bold; margin-top: 10px; }
       td { padding: 2px 0; }
       .separator { border-top: 1px dashed #000; margin: 4px 0; }
@@ -181,8 +176,8 @@ const printContent = `
   </head>
   <body>
     <img src="https://res.cloudinary.com/dtipim18j/image/upload/v1760371396/logo_rnsgxs.png"
-         style="width:90px; margin-bottom:10px;" />
-    <h2>Tahir Fruit Chaat</h2>
+         style="width:90px; margin-bottom:2px;" />
+    <p class="tfc">Tahir Fruit Chaat</p>
     <p class="date">${date}</p>
     <div class="separator"></div>
     <p><b>INVOICE: ${invoiceId}</b></p>
@@ -192,7 +187,7 @@ const printContent = `
       <tbody>${itemsHTML}</tbody>
     </table>
     <div class="separator"></div>
-    <p>Total: ${displayTotal.toFixed(2)} PKR</p>
+    <p>Total: ${realTotal.toFixed(2)} PKR</p>
     <p class="${isTahirMode ? "payable-waived" : ""}">
       Payable: ${displayPayable.toFixed(2)} PKR
       
@@ -218,19 +213,15 @@ const printContent = `
 </html>
 `;
 
-
-
-
     const newWindow = window.open("", "_blank", "width=400,height=600");
     newWindow?.document.write(printContent);
     newWindow?.document.close();
     newWindow?.focus();
-    newWindow?.print();
 
     setInvoiceNumber(Math.floor(Math.random() * 1000000));
     toast({
       title: "Sale Completed",
-      description: `Total: ${effectiveTotal.toFixed(2)} PKR (${isTahirMode ? "Tahir Sb Mode" : "Normal"})`,
+      description: `Total: ${effectiveTotal.toFixed(2)} PKR (${isTahirMode ? "Tahir Mode" : "Normal"})`,
     });
   };
 
@@ -424,33 +415,37 @@ const printContent = `
             <ScrollArea className="h-[420px] md:h-[500px]">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {filteredProducts.map((product) => {
-                  const isEligibleForPlate = ["biryani", "karahi", "rice", "bbq", "meal", "chaat"].some((kw) =>
-                    product.name.toLowerCase().includes(kw)
-                  );
+                  const isCardDisabled =
+                    product.isSolo
+                      ? product.fullStock === 0
+                      : product.fullStock === 0 && product.halfStock === 0;
+
+                  const plateOptions = product.isSolo
+                    ? [{ label: "Full Plate", price: product.fullPrice, stock: product.fullStock }]
+                    : [
+                      { label: "Full Plate", price: product.fullPrice, stock: product.fullStock },
+                      { label: "Half Plate", price: product.halfPrice, stock: product.halfStock },
+                    ];
 
                   return (
                     <Card
                       key={product._id}
-                      className={`cursor-pointer border rounded-xl transition-all ${product.stock <= 0 ? "opacity-50 cursor-not-allowed" : "hover:border-[#ff6600] hover:shadow-lg"}`}
+                      className={`cursor-pointer border rounded-xl transition-all ${isCardDisabled ? "opacity-50 cursor-not-allowed" : "hover:border-[#ff6600] hover:shadow-lg"
+                        }`}
                       onClick={() => {
-                        if (product.stock <= 0) return;
-                        if (isEligibleForPlate) {
+                        if (isCardDisabled) return;
+
+                        if (product.isSolo) addToCart(product); // Full Plate only
+                        else {
                           setSelectedProduct(product);
                           setSelectedPlate("Full Plate");
-                        } else {
-                          addToCart({
-                            ...product,
-                            selectedPrice: product.fullPrice,
-                            plateType: "Full Plate",
-                            quantity: 1,
-                          });
                         }
                       }}
                     >
                       {product.imageUrl && (
                         <div className="aspect-square overflow-hidden rounded-t-xl relative">
                           <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                          {product.stock <= 0 && <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-red-600 font-bold text-sm">Out of Stock</div>}
+                          {isCardDisabled && <div className="absolute inset-0 bg-white/70 flex items-center justify-center text-red-600 font-bold text-sm">Out of Stock</div>}
                         </div>
                       )}
                       <CardContent className="p-3">
@@ -458,12 +453,12 @@ const printContent = `
                         <p className="text-xs text-gray-500">Tahir Fruit Chaat</p>
                         <div className="flex justify-between items-center mt-2">
                           <span className="font-bold text-[#ff6600]">{product.fullPrice} PKR</span>
-                          <span className="text-xs text-gray-500">Stock: {product.stock}</span>
                         </div>
                       </CardContent>
                     </Card>
                   );
                 })}
+
               </div>
             </ScrollArea>
           </CardContent>
@@ -481,33 +476,50 @@ const printContent = `
             <Label>Order Taker</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 mb-5 mt-3">
               {orderTakers
-                .filter(
-                  (taker) =>
-                    !taker.name.toLowerCase().includes("tahir sb") || tahirPinActive // show Tahir Sb when mode active
-                )
+                // ✅ Filter logic
+                .filter((taker) => {
+                  const name = taker.name.toLowerCase();
+                  if (name === "open sale") return true; // always show if exists in DB
+                  if (name.includes("tahir sb")) return tahirPinActive; // show only when QR active
+                  return true; // show all others normally
+                })
                 .map((taker) => (
-
                   <div
                     key={taker.id}
                     onClick={() => {
-                      if (taker.balance > 0) {
+                      // ✅ Customer always selectable
+                      if (taker.name.toLowerCase() === "open sale" || taker.balance > 0) {
                         setOrderTaker(taker.id);
                         if (!taker.name.toLowerCase().includes("tahir sb")) {
-                          setCustomTotal(null); // restore normal total when switching away
+                          setCustomTotal(null);
                         }
                       }
                     }}
-
-                    className={`relative flex flex-col items-center p-4 rounded-2xl border-[2px] cursor-pointer transition-all ${orderTaker === taker.id ? "border-[#ff6600] bg-white/60 shadow-lg" : "border-transparent bg-white/30 hover:bg-white/50"
-                      } ${taker.balance <= 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`relative flex flex-col items-center p-4 rounded-2xl border-[2px] cursor-pointer transition-all
+        ${taker.name.toLowerCase() === "open sale"
+                        ? orderTaker === taker.id
+                          ? "border-[#ff6600] bg-white/60 shadow-lg"
+                          : "border-transparent bg-white/30 hover:bg-white/50"
+                        : taker.balance <= 0
+                          ? "border-red-500 opacity-50 cursor-not-allowed"
+                          : orderTaker === taker.id
+                            ? "border-[#ff6600] bg-white/60 shadow-lg"
+                            : "border-transparent bg-white/30 hover:bg-white/50"
+                      }`}
                   >
                     <User className="w-10 h-10 mb-3 border border-[#ff6600]/40 rounded-xl" />
                     <div className="text-center">
                       <p className="text-sm text-gray-800">{taker.name}</p>
-                      <p className={`text-sm ${taker.balance > 0 ? "text-green-600" : "text-red-500"}`}>Balance: Rs. {taker.balance}</p>
+                      <p
+                        className={`text-sm ${taker.balance > 0 ? "text-green-600" : "text-red-500"
+                          }`}
+                      >
+                        Balance: Rs. {taker.balance}
+                      </p>
                     </div>
                   </div>
                 ))}
+
             </div>
             <div>
               <Label>Tahir Sb</Label>
@@ -601,7 +613,11 @@ const printContent = `
               ) : (
                 <div className="space-y-4">
                   {cart.map((item: CartItem) => {
-                    const isOutOfStock = item.quantity >= item.stock;
+                    const isOutOfStock =
+                      item.plateType === "Half Plate"
+                        ? item.quantity > item.halfStock
+                        : item.quantity > item.fullStock;
+
                     return (
                       <div key={item._id} className="p-4 mb-3 rounded-2xl border-[1.5px] backdrop-blur-md">
                         <div className="flex gap-3 items-start">
@@ -619,9 +635,36 @@ const printContent = `
                           </Button>
                         </div>
                         <div className="flex items-center gap-2 mt-3">
-                          <Button variant="outline" size="icon" disabled={item.quantity <= 1} onClick={() => updateCartQuantity(item._id, item.plateType, item.quantity - 1)}><Minus className="h-4 w-4" /></Button>
+                          {/* Decrease Quantity */}
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={item.quantity <= 1}
+                            onClick={() =>
+                              updateCartQuantity(item._id, item.plateType, item.quantity - 1)
+                            }
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+
                           <span className="w-10 text-center font-semibold text-gray-800">{item.quantity}</span>
-                          <Button variant="outline" size="icon" disabled={isOutOfStock} onClick={() => updateCartQuantity(item._id, item.plateType, item.quantity + 1)}><Plus className="h-4 w-4" /></Button>
+
+                          {/* Increase Quantity */}
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            disabled={
+                              (item.plateType === "Full Plate"
+                                ? item.quantity >= item.fullStock
+                                : item.quantity >= item.halfStock)
+                            }
+                            onClick={() =>
+                              updateCartQuantity(item._id, item.plateType, item.quantity + 1)
+                            }
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+
                           <span className="ml-auto font-semibold text-[#ff6600]">{(item.selectedPrice * item.quantity).toFixed(2)} PKR</span>
                         </div>
                       </div>
@@ -665,24 +708,34 @@ const printContent = `
             <div className="space-y-3">
               <p className="font-medium text-black">{selectedProduct.name}</p>
               <div className="flex gap-3 mt-3">
-                {["Full Plate", "Half Plate"].map((type) => (
-                  <Button
-                    key={type}
-                    variant={selectedPlate === type ? "default" : "outline"}
-                    className={`flex-1 ${selectedPlate === type ? "bg-[#ff6600] text-white" : "border-gray-300 text-black hover:border-[#ff6600]"}`}
-                    onClick={() => {
-                      if (!selectedProduct) return;
+                {["Full Plate", "Half Plate"].map((type) => {
+                  const stock = type === "Full Plate" ? selectedProduct.fullStock : selectedProduct.halfStock;
+                  const cartItem = cart.find(
+                    (c) => c._id === selectedProduct._id && c.plateType === type
+                  );
+                  const currentQty = cartItem ? cartItem.quantity : 0;
 
-                      // ✅ Use new addToCart with plate type
-                      addToCart(selectedProduct, type as "Full Plate" | "Half Plate");
+                  const isButtonDisabled = stock === 0 || currentQty >= stock;
 
-                      setSelectedProduct(null);
-                      setSelectedPlate("Full Plate"); // reset dialog
-                    }}
-                  >
-                    {type} ({type === "Full Plate" ? selectedProduct.fullPrice : selectedProduct.halfPrice} PKR)
-                  </Button>
-                ))}
+
+                  return (
+                    <Button
+                      key={type}
+                      variant={selectedPlate === type ? "default" : "outline"}
+                      className={`flex-1 ${selectedPlate === type ? "bg-[#ff6600] text-white" : "border-gray-300 text-black hover:border-[#ff6600]"}`}
+                      disabled={isButtonDisabled}
+                      onClick={() => {
+                        if (!selectedProduct || isButtonDisabled) return;
+                        addToCart(selectedProduct, type as "Full Plate" | "Half Plate");
+                        setSelectedProduct(null);
+                        setSelectedPlate("Full Plate");
+                      }}
+                    >
+                      {type} ({type === "Full Plate" ? selectedProduct.fullPrice : selectedProduct.halfPrice} PKR)
+                    </Button>
+                  );
+                })}
+
               </div>
             </div>
           </DialogContent>
