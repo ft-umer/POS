@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import GenerateQR from "../generateqrcode";
 import { toast } from "@/hooks/use-toast";
+
 
 const AdminList = () => {
   const { user, users, fetchUsers, token } = useAuth();
@@ -20,6 +20,10 @@ const AdminList = () => {
 
   const admins = useMemo(() => (users || []).filter((u) => u.role === "admin"), [users]);
 
+  // 🧩 NEW: Admin Activity State
+  const [activities, setActivities] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+
   // Auto-refresh admin list every 10s
   useEffect(() => {
     if (user?.role === "superadmin") {
@@ -28,6 +32,30 @@ const AdminList = () => {
       return () => clearInterval(interval);
     }
   }, [user, fetchUsers]);
+
+  // 🧩 NEW: Fetch Admin Activity every 15s
+  useEffect(() => {
+    if (user?.role === "superadmin" && token) {
+      const fetchActivity = async () => {
+        try {
+          setActivityLoading(true);
+          const res = await fetch("https://pos-backend-kappa.vercel.app/activity", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          const data = await res.json();
+          if (Array.isArray(data)) setActivities(data);
+        } catch (err) {
+          console.error("Error fetching admin activity:", err);
+        } finally {
+          setActivityLoading(false);
+        }
+      };
+
+      fetchActivity();
+      const interval = setInterval(fetchActivity, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [user, token]);
 
   if (user?.role !== "superadmin") {
     return <div className="text-center text-gray-600 py-20">Only SuperAdmin can view this page.</div>;
@@ -67,12 +95,11 @@ const AdminList = () => {
       } else {
         setSuccess("Admin added successfully");
 
-        // Generate QR code string: username|password|pin
         const qrString = `${adminData.username}|${adminData.password}|${adminData.pin}`;
-        setQrForAdmin(qrString); // Show QR modal automatically
+        setQrForAdmin(qrString);
 
         setFormData({ username: "", pin: "", site: "" });
-        fetchUsers(); // refresh list
+        fetchUsers();
       }
     } catch (err) {
       setError("Server error while adding admin");
@@ -83,7 +110,7 @@ const AdminList = () => {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 bg-white text-gray-900">
+    <><div className="space-y-6 sm:space-y-8 bg-white text-gray-900">
       {/* Add Admin Form */}
       <Card className="shadow-sm border border-gray-100">
         <CardHeader>
@@ -124,7 +151,6 @@ const AdminList = () => {
                     <TableHead>Last Login</TableHead>
                     <TableHead>Last Logout</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>QR Code</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -146,31 +172,30 @@ const AdminList = () => {
                         <TableCell>
                           <Badge
                             variant="outline"
-                            className={`${isOnline ? "border-green-200 text-green-600 bg-green-50" : "border-red-200 text-red-600 bg-red-50"}`}
+                            className={`${isOnline
+                                ? "border-green-200 text-green-600 bg-green-50"
+                                : "border-red-200 text-red-600 bg-red-50"}`}
                           >
                             {isOnline ? "Online" : "Offline"}
                           </Badge>
                         </TableCell>
 
                         {/* Show QR code in table */}
-                        <TableCell>
-                          <GenerateQR qrData={qrString} />
-                        </TableCell>
+
 
                         <TableCell>
-
-                          {/* Delete button */}
                           <Button
                             variant="destructive"
                             size="sm"
                             onClick={async () => {
-
-
                               try {
-                                const res = await fetch(`https://pos-backend-kappa.vercel.app/users/${admin._id}`, {
-                                  method: "DELETE",
-                                  headers: { Authorization: `Bearer ${token}` },
-                                });
+                                const res = await fetch(
+                                  `https://pos-backend-kappa.vercel.app/users/${admin._id}`,
+                                  {
+                                    method: "DELETE",
+                                    headers: { Authorization: `Bearer ${token}` },
+                                  }
+                                );
 
                                 const data = await res.json();
                                 if (!res.ok) throw new Error(data.message || "Failed to delete admin");
@@ -189,12 +214,10 @@ const AdminList = () => {
                                   description: "There was an error deleting this admin. Please try again.",
                                 });
                               }
-                            }}
+                            } }
                           >
                             Delete
                           </Button>
-
-
                         </TableCell>
                       </TableRow>
                     );
@@ -205,7 +228,46 @@ const AdminList = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* 🧩 NEW: Admin Activity Log Section */}
+      <Card className="shadow-sm border border-gray-100">
+        <CardHeader>
+          <CardTitle className="text-lg sm:text-xl font-semibold text-gray-800">
+            Admin Activity Log {activityLoading && <span className="text-sm text-gray-500">(Loading...)</span>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0 sm:p-5">
+          {activities.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">No activity recorded yet</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-orange-100">
+                    <TableHead>Admin</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Timestamp</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activities.map((a) => (
+                    <TableRow key={a._id}>
+                      <TableCell className="font-medium text-gray-800">{a.username}</TableCell>
+                      <TableCell className="text-gray-700">{a.action}</TableCell>
+                      <TableCell className="text-gray-700">
+                        {new Date(a.timestamp).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  
+    </>
   );
 };
 

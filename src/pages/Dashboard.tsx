@@ -41,7 +41,7 @@ const Dashboard = () => {
   const navigation =
     user.role === "superadmin"
       ? allNavigation
-      : allNavigation.filter((item) => item.name !== "Order Takers" && item.name !== "Admins" && item.name !== "Sales");
+      : allNavigation.filter((item) => item.name !== "Admins" && item.name !== "Sales");
 
   return (
     <div className="min-h-screen flex flex-col text-gray-900">
@@ -125,11 +125,11 @@ const Dashboard = () => {
             <Routes>
               <Route path="/" element={<POSInterface />} />
               <Route path="/products" element={<Products />} />
-
+<Route path="/order-takers" element={<OrderTakers />} />
               {user.role === "superadmin" && (
                 <>
                   <Route path="/sales" element={<Sales />} />
-                  <Route path="/order-takers" element={<OrderTakers />} />
+                  
                   <Route path="/admins" element={<AdminList />} />
                 </>
               )}

@@ -703,43 +703,68 @@ const POSInterface = () => {
         <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
           <DialogContent className="rounded-xl">
             <DialogHeader>
-              <DialogTitle className="text-black">Select Plate Type</DialogTitle>
+              <DialogTitle className="text-black">
+                Select{" "}
+                {(() => {
+                  const name = selectedProduct?.name?.toLowerCase() || "";
+                  const drinkKeywords = ["drink", "water", "bottle", "juice", "cola", "pepsi", "soda"];
+                  const isDrink = drinkKeywords.some((kw) => name.includes(kw));
+                  return isDrink ? "Bottle" : "Plate";
+                })()}{" "}
+                Type
+              </DialogTitle>
             </DialogHeader>
+
             <div className="space-y-3">
               <p className="font-medium text-black">{selectedProduct.name}</p>
+
               <div className="flex gap-3 mt-3">
-                {["Full Plate", "Half Plate"].map((type) => {
-                  const stock = type === "Full Plate" ? selectedProduct.fullStock : selectedProduct.halfStock;
+                {(() => {
+                  const name = selectedProduct?.name?.toLowerCase() || "";
+                  const drinkKeywords = ["drink", "water", "bottle", "juice", "cola", "pepsi", "soda"];
+                  const isDrink = drinkKeywords.some((kw) => name.includes(kw));
+                  return isDrink ? ["Full Bottle", "Half Bottle"] : ["Full Plate", "Half Plate"];
+                })().map((type) => {
+                  const stock = type.includes("Full")
+                    ? selectedProduct.fullStock
+                    : selectedProduct.halfStock;
+
+                  const price = type.includes("Full")
+                    ? selectedProduct.fullPrice
+                    : selectedProduct.halfPrice;
+
                   const cartItem = cart.find(
                     (c) => c._id === selectedProduct._id && c.plateType === type
                   );
+
                   const currentQty = cartItem ? cartItem.quantity : 0;
-
                   const isButtonDisabled = stock === 0 || currentQty >= stock;
-
 
                   return (
                     <Button
                       key={type}
                       variant={selectedPlate === type ? "default" : "outline"}
-                      className={`flex-1 ${selectedPlate === type ? "bg-[#ff6600] text-white" : "border-gray-300 text-black hover:border-[#ff6600]"}`}
+                      className={`flex-1 ${selectedPlate === type
+                          ? "bg-[#ff6600] text-white"
+                          : "border-gray-300 text-black hover:border-[#ff6600]"
+                        }`}
                       disabled={isButtonDisabled}
                       onClick={() => {
                         if (!selectedProduct || isButtonDisabled) return;
-                        addToCart(selectedProduct, type as "Full Plate" | "Half Plate");
+                        addToCart(selectedProduct, type);
                         setSelectedProduct(null);
-                        setSelectedPlate("Full Plate");
+                        setSelectedPlate(type);
                       }}
                     >
-                      {type} ({type === "Full Plate" ? selectedProduct.fullPrice : selectedProduct.halfPrice} PKR)
+                      {type} ({price} PKR)
                     </Button>
                   );
                 })}
-
               </div>
             </div>
           </DialogContent>
         </Dialog>
+
       )}
 
       <Dialog open={pinDialogOpen} onOpenChange={setPinDialogOpen}>

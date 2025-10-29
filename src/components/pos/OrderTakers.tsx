@@ -23,12 +23,15 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { usePOS } from "@/contexts/POSContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const OrderTakers = () => {
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [editingTaker, setEditingTaker] = useState<string | null>(null);
   const { orderTakers, addOrderTaker, updateOrderTaker, deleteOrderTaker } = usePOS();
+  const {user} = useAuth();
+  const isSuperAdmin = user?.role === "superadmin";
 
   const [formData, setFormData] = useState({
     name: "",
@@ -110,12 +113,12 @@ const handleDelete = async (takerId: string) => {
             if (!open) resetForm();
           }}
         >
-          <DialogTrigger asChild>
+         {isSuperAdmin &&  <DialogTrigger asChild>
             <Button className="w-full sm:w-auto bg-primary hover:bg-hover text-white font-medium shadow-md transition">
               <Plus className="h-4 w-4 mr-2" />
               Add Order Taker
             </Button>
-          </DialogTrigger>
+          </DialogTrigger>}
 
           <DialogContent className="max-w-[95vw] sm:max-w-[400px] bg-white rounded-2xl shadow-lg p-6">
             <DialogHeader>
@@ -219,28 +222,33 @@ const handleDelete = async (takerId: string) => {
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(taker)}
-                            className="text-primary hover:bg-orange-100"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(taker.id)}
-                            disabled={loading === taker.id} // disable while deleting
-                          >
-                            {loading === taker.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                            ) : (
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            )}
-                          </Button>
+  {/* Edit button always visible, but other admins can edit ONLY balance */}
+  <Button
+    variant="ghost"
+    size="icon"
+    onClick={() => handleEdit(taker)}
+    className="text-primary hover:bg-orange-100"
+  >
+    <Pencil className="h-4 w-4" />
+  </Button>
 
-                        </div>
+  {/* Delete only for superadmin */}
+  {isSuperAdmin && (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => handleDelete(taker.id)}
+      disabled={loading === taker.id}
+    >
+      {loading === taker.id ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : (
+        <Trash2 className="h-4 w-4 text-destructive" />
+      )}
+    </Button>
+  )}
+</div>
+
                       </TableCell>
                     </TableRow>
                   ))
